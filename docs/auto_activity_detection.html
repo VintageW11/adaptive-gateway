@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Auto activity detection — methodology and formulas</title>
+<style>
+  @page { size: A4; margin: 22mm 20mm; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 12pt;
+    line-height: 1.45;
+    color: #111;
+  }
+  h1 { font-size: 16pt; text-align: center; margin: 0 0 10pt; }
+  h2 { font-size: 13pt; margin: 16pt 0 8pt; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin: 12pt 0 6pt; page-break-after: avoid; }
+  p { margin: 0 0 8pt; }
+  .simple {
+    margin: 0 0 10pt;
+    font-style: italic;
+  }
+  .eq {
+    display: block;
+    text-align: center;
+    margin: 12pt 0;
+    font-size: 12.5pt;
+  }
+  .eqarray {
+    margin: 12pt auto;
+    border-collapse: collapse;
+    font-size: 12.5pt;
+  }
+  .eqarray td {
+    border: none;
+    padding: 1pt 6pt;
+    vertical-align: baseline;
+  }
+  .eqarray td.lhs { text-align: right; white-space: nowrap; }
+  .eqarray td.eq { text-align: center; padding: 1pt 4pt; }
+  .eqarray td.rhs { text-align: left; }
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8pt 0 12pt;
+    font-size: 10.5pt;
+    page-break-inside: avoid;
+  }
+  table.data th, table.data td {
+    border: 1px solid #444;
+    padding: 4pt 6pt;
+    vertical-align: top;
+    text-align: left;
+  }
+  table.data th { background: #efefef; font-weight: bold; }
+  td.num { text-align: right; white-space: nowrap; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 10.5pt; }
+  .var { font-style: italic; font-family: "Times New Roman", Times, serif; }
+  ol.pipe { margin: 0 0 10pt 22pt; padding: 0; }
+  ol.pipe li { margin: 0 0 4pt; }
+</style>
+</head>
+<body>
+<h1>Auto activity detection — methodology and formulas</h1>
+
+<p>When the dashboard profile is set to <strong>Auto</strong>, the gateway does not pick a VPN directly from the packet stream. It first guesses <em>what the user is doing</em>, maps that guess to one of four traffic profiles, then runs the usual SAW ranking with that profile’s weights. This note is the live classifier in <code>classify_from_signals</code> / <code>classify_device</code> / <code>auto_hysteresis_need</code>.</p>
+<p class="simple"><strong>In simple terms:</strong> Auto is a two-step process. Step 1 looks at how busy the line is and whether the traffic looks like browsing, a call, a video, or a download. Step 2 is the same SAW formula as the rest of the paper: whichever VPN scores highest under that activity’s weights is the one that is used.</p>
+
+<h2>1. Two-layer decision</h2>
+<ol class="pipe">
+  <li>Measure this device’s rate, upload/download mix, UDP vs TCP, and (when available) DNS / CDN destination hints.</li>
+  <li>Score four activity votes <span class="var">V</span><sub>balanced</sub>, <span class="var">V</span><sub>gaming</sub>, <span class="var">V</span><sub>streaming</sub>, <span class="var">V</span><sub>downloads</sub>.</li>
+  <li>Take the winner as a candidate profile <span class="var">p</span><sup>guess</sup>.</li>
+  <li>Hold that guess through hysteresis (a few ticks / a short gap) so one burst does not flip the UI.</li>
+  <li>Commit <span class="var">p</span><sup>*</sup> and rank VPNs with SAW using weights <span class="var">w</span>(<span class="var">p</span><sup>*</sup>).</li>
+</ol>
+<div class="eq"><span class="var">p</span><sup>*</sup> = hysteresis( arg&nbsp;max<sub><span class="var">p</span></sub> <span class="var">V</span><sub><span class="var">p</span></sub> )</div>
+<div class="eq"><span class="var">i</span><sup>*</sup> = arg&nbsp;max<sub><span class="var">i</span></sub> <span class="var">S</span><sub><span class="var">i</span></sub>( <span class="var">w</span>(<span class="var">p</span><sup>*</sup>) )</div>
+<p>UI names: Everyday browsing = <code>balanced</code>, Gaming &amp; calls = <code>gaming</code>, Video streaming = <code>streaming</code>, Big downloads = <code>downloads</code>.</p>
+<p class="simple"><strong>In simple terms:</strong> Auto never invents a fifth SAW formula. It only chooses which of the four weight vectors to plug in. Fail, affinity, and live ping metrics stay exactly as in the SAW write-up.</p>
+
+<h2>2. Signals (what is measured)</h2>
+<table class="data">
+  <thead>
+    <tr><th>Symbol</th><th>Meaning</th><th>Where it comes from</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="var">r</span></td><td>Combined rate (Mbps)</td><td>LAN sample, plus download <span class="var">r</span><sub>x</sub> and upload <span class="var">r</span><sub>tx</sub></td></tr>
+    <tr><td><span class="var">r</span><sub>x</sub>, <span class="var">r</span><sub>tx</sub></td><td>Download / upload (Mbps)</td><td>RouterOS connection rates; if both are 0, <span class="var">r</span><sub>x</sub> ← <span class="var">r</span></td></tr>
+    <tr><td><span class="var">N</span><sub>udp</sub>, <span class="var">N</span><sub>tcp</sub></td><td>Flow counts</td><td>Firewall / conntrack for this LAN IP</td></tr>
+    <tr><td><span class="var">u</span></td><td>UDP mix</td><td><span class="var">u</span> = <span class="var">N</span><sub>udp</sub> / max(<span class="var">N</span><sub>udp</sub>+<span class="var">N</span><sub>tcp</sub>, 1)</td></tr>
+    <tr><td>bidir</td><td>Two-way flow</td><td><span class="var">r</span><sub>x</sub> ≥ 0.02 and <span class="var">r</span><sub>tx</sub> ≥ 0.02, or a replied UDP voice flow</td></tr>
+    <tr><td>QUIC</td><td>UDP/443 or UDP/80</td><td>Forwarded HTTP/3 (YouTube often looks like this)</td></tr>
+    <tr><td>DNS / CDN</td><td>Host-name hints</td><td>Used internally; the dashboard evidence line stays metric-only (Mbps, UDP/TCP)</td></tr>
+    <tr><td><span class="var">agg</span></td><td>House WAN/LAN rate</td><td>Copied onto a VPN-hairpinned PC when the house is actually pulling</td></tr>
+  </tbody>
+</table>
+<table class="eqarray">
+  <tr>
+    <td class="lhs"><span class="var">r</span></td>
+    <td class="eq">=</td>
+    <td class="rhs">max(<span class="var">r</span><sub>LAN</sub>, <span class="var">r</span><sub>x</sub>, <span class="var">r</span><sub>tx</sub>)</td>
+  </tr>
+  <tr>
+    <td class="lhs"><span class="var">agg</span></td>
+    <td class="eq">=</td>
+    <td class="rhs">max(<span class="var">r</span><sub>WAN</sub>, <span class="var">r</span><sub>host</sub>)</td>
+  </tr>
+</table>
+<p>VPN hairpin (PC → Ubuntu tunnel → Internet) often looks idle on the MikroTik mangle counters. If the house WAN is in the video band, Auto may copy that house rate onto this PC:</p>
+<div class="eq">house_pull &harr; 0.22 ≤ <span class="var">agg</span> &lt; 6.0</div>
+<p>Copy is skipped when Discord-like names are present, there is no video-CDN evidence, and <span class="var">agg</span> &lt; 0.45 Mbps (chat must not be treated as YouTube). Otherwise, if this is the sole / only-busy client, or QUIC / CDN is visible:</p>
+<div class="eq"><span class="var">r</span> ← max(<span class="var">r</span>, <span class="var">agg</span>),&emsp;<span class="var">r</span><sub>x</sub> ← max(<span class="var">r</span><sub>x</sub>, <span class="var">agg</span>)</div>
+<p>Host-wide Auto (the dashboard “Right now” line) uses the same classifier with house WAN rate. If every known LAN client is idle and <span class="var">agg</span> &lt; 0.22, it forces Everyday browsing so leftover DNS cache cannot keep Video streaming on.</p>
+<p class="simple"><strong>In simple terms:</strong> Auto looks at how many megabits are moving, whether they are mostly coming down or going up, and whether the packets are UDP (games, calls, HTTP/3 video) or TCP. Names such as googlevideo or discord.media can confirm the guess, but they are not shown on the dashboard. If your PC’s traffic is hidden inside a VPN, Auto may borrow the whole-house download rate so YouTube still counts as video.</p>
+
+<h2>3. Shape tests (the boolean rules)</h2>
+<p>Rates are in Mbps. All of the following are evaluated every engine tick (~a few seconds).</p>
+<table class="eqarray">
+  <tr>
+    <td class="lhs">idle</td>
+    <td class="eq">&harr;</td>
+    <td class="rhs"><span class="var">r</span> &lt; 0.08 &nbsp;∧&nbsp; <span class="var">N</span><sub>udp</sub> &lt; 2 &nbsp;∧&nbsp; ¬bidir</td>
+  </tr>
+  <tr>
+    <td class="lhs">video_like</td>
+    <td class="eq">&harr;</td>
+    <td class="rhs">0.22 ≤ <span class="var">r</span> &lt; 6.0</td>
+  </tr>
+  <tr>
+    <td class="lhs">download_heavy</td>
+    <td class="eq">&harr;</td>
+    <td class="rhs"><span class="var">r</span><sub>x</sub> ≥ 0.22 &nbsp;∧&nbsp; <span class="var">r</span><sub>x</sub> &gt; 2.5 max(<span class="var">r</span><sub>tx</sub>, 0.01)</td>
+  </tr>
+  <tr>
+    <td class="lhs">upload_heavy</td>
+    <td class="eq">&harr;</td>
+    <td class="rhs"><span class="var">r</span><sub>tx</sub> ≥ 0.2 &nbsp;∧&nbsp; <span class="var">r</span><sub>tx</sub> ≥ 0.35 <span class="var">r</span><sub>x</sub></td>
+  </tr>
+  <tr>
+    <td class="lhs">bulk</td>
+    <td class="eq">&harr;</td>
+    <td class="rhs">(<span class="var">r</span> ≥ 8 &nbsp;∨&nbsp; bulk_sustained) &nbsp;∧&nbsp; ¬video_cdn</td>
+  </tr>
+</table>
+<p>bulk_sustained is true when at least two recent house-rate samples are ≥ 6 Mbps. play_floor = 0.22 Mbps (something is still being pulled, not just a leftover tab name).</p>
+<p>Interactive / call-shaped traffic (used for Gaming &amp; calls when no video is winning):</p>
+<div class="eq">call_like &harr; ¬idle &nbsp;∧&nbsp; <span class="var">r</span> &lt; 6 &nbsp;∧&nbsp; ( (bidir ∧ (<span class="var">N</span><sub>udp</sub> ≥ 2 ∨ <span class="var">u</span> ≥ 0.2)) ∨ (<span class="var">N</span><sub>udp</sub> ≥ 3 ∧ <span class="var">r</span> ≥ 0.08) )</div>
+<div class="eq">metric_game &harr; ¬idle &nbsp;∧&nbsp; <span class="var">r</span> &lt; 0.6 &nbsp;∧&nbsp; (UDP mix with <span class="var">N</span><sub>udp</sub> ≥ 3 and/or bidir)</div>
+<p>QUIC without bidir and with <span class="var">N</span><sub>udp</sub> &lt; 3 is <em>not</em> treated as a game/call (that is typical YouTube HTTP/3).</p>
+<p class="simple"><strong>In simple terms:</strong> Quiet line = browsing. A steady one-way download around a few Mbps = video-shaped. Lots of UDP going both ways at a modest rate = a call or a game. A very fat transfer (about 8 Mbps or a sustained 6+ Mbps) = a download, unless a video CDN is already in play. Chat in Discord is mostly HTTPS and does not look like a call; a real voice session or Go Live does, because it uses two-way UDP or a heavy upload.</p>
+
+<h2>4. Watching vs calling (priority)</h2>
+<p>Video names (CDN keys such as googlevideo, nflxvideo, ttvnw) and destination-IP hints set pulling_video. A leftover site name (youtube.com, netflix, …) plus download_heavy sets leftover_site. Discord tray names (discord.com / discord.gg) are <em>not</em> a call; discord.media / rtc.discord / discord-gateway are.</p>
+<p><strong>Without</strong> a Discord app hint:</p>
+<div class="eq">watching &harr; ((pulling_video ∨ leftover_site) ∧ <span class="var">r</span> ≥ 0.22 ∧ ¬upload_heavy) &nbsp;∨&nbsp; (video_like ∧ ¬download_hit)</div>
+<p><strong>With</strong> a Discord app hint, chat-plus-tabs must not count as video. Watching requires a clearer pull:</p>
+<div class="eq">watching<sub>Discord</sub> &harr; <span class="var">r</span> ≥ 0.45 ∧ ¬upload_heavy ∧ (pulling_video ∨ leftover_site ∨ download_heavy)</div>
+<p>If Discord is on a real call / Go Live and there is no video CDN, watching is cleared so Gaming &amp; calls can win:</p>
+<div class="eq">if Discord ∧ (live_call_udp ∨ golive) ∧ ¬pulling_video then watching ← false</div>
+<div class="eq">golive &harr; upload_heavy ∧ <span class="var">r</span> &lt; 8 ∧ ¬video_cdn</div>
+<p>Call activity (only if not already watching or bulk):</p>
+<div class="eq">call_active &harr; ¬watching ∧ ¬bulk ∧ ( (real_call_DNS ∧ call_like) ∨ (Discord ∧ (live_call_udp ∨ golive)) ∨ (golive ∧ live_call_udp) )</div>
+<p class="simple"><strong>In simple terms:</strong> YouTube playing beats leftover game or chat names. Discord sitting in the tray with other tabs open stays Everyday browsing. Discord voice or screen share (Go Live) goes to Gaming &amp; calls. If you are actually watching YouTube at the same time as Discord, video still wins because the CDN pull is visible.</p>
+
+<h2>5. Vote scores</h2>
+<p>Start from Everyday browsing as the default:</p>
+<div class="eq"><span class="var">V</span><sub>balanced</sub> = 1,&emsp; <span class="var">V</span><sub>gaming</sub> = <span class="var">V</span><sub>streaming</sub> = <span class="var">V</span><sub>downloads</sub> = 0</div>
+<p>If watching:</p>
+<table class="eqarray">
+  <tr>
+    <td class="lhs"><span class="var">V</span><sub>streaming</sub></td>
+    <td class="eq">←</td>
+    <td class="rhs"><span class="var">V</span><sub>streaming</sub> + 2 + 8·[video_cdn] + 4·[sticky_stream] + 2·[QUIC] + 4·[video_like ∧ ¬download_hit]</td>
+  </tr>
+  <tr>
+    <td class="lhs"><span class="var">V</span><sub>gaming</sub></td>
+    <td class="eq">←</td>
+    <td class="rhs">0 &nbsp;(watching zeros the game vote)</td>
+  </tr>
+</table>
+<p>Else if bulk:</p>
+<div class="eq"><span class="var">V</span><sub>downloads</sub> ← <span class="var">V</span><sub>downloads</sub> + 6 + 4·[download_DNS]</div>
+<p>Else (interactive / light):</p>
+<table class="eqarray">
+  <tr>
+    <td class="lhs"><span class="var">V</span><sub>gaming</sub></td>
+    <td class="eq">+=</td>
+    <td class="rhs">6·[call_active] + 6·[real_game ∧ ¬idle] + 1.2·[weak_game ∧ 0.08 ≤ <span class="var">r</span> &lt; 0.6] + 6·[metric_game]</td>
+  </tr>
+  <tr>
+    <td class="lhs"></td>
+    <td class="eq">+</td>
+    <td class="rhs">1.5 if a game/call vote is already on and <span class="var">u</span> ≥ 0.25 and <span class="var">N</span><sub>udp</sub> ≥ 3</td>
+  </tr>
+  <tr>
+    <td class="lhs"><span class="var">V</span><sub>downloads</sub></td>
+    <td class="eq">+=</td>
+    <td class="rhs">4 if download_DNS and <span class="var">r</span> ≥ 1.5</td>
+  </tr>
+</table>
+<p>Iverson brackets [·] are 1 when the test is true, else 0. Weak game DNS (for example a Steam tray name without matchmaking) only adds 1.2 — not enough alone to leave browsing.</p>
+<p>Winner:</p>
+<div class="eq"><span class="var">p</span><sup>guess</sup> = arg&nbsp;max<sub><span class="var">p</span></sub> <span class="var">V</span><sub><span class="var">p</span></sub></div>
+<div class="eq">if <span class="var">V</span><sub><span class="var">p</span><sup>guess</sup></sub> &lt; 2.5 then <span class="var">p</span><sup>guess</sup> ← balanced</div>
+<p class="simple"><strong>In simple terms:</strong> Each activity gets points. Video can score from about 6 up to 16. A real call or in-game session scores about 6–13.5. A bulk transfer scores 6–10. Everyday browsing starts with 1 point and wins whenever nothing else reaches 2.5 — that is why idle, light tabs, and Discord chat stay on browsing.</p>
+
+<h2>6. Hysteresis (when the guess is allowed to stick)</h2>
+<p>The classifier runs every tick. The committed profile <span class="var">p</span><sup>*</sup> only changes after <span class="var">H</span> agreeing ticks and a minimum gap <span class="var">G</span> seconds since the last switch:</p>
+<div class="eq">commit if hits(<span class="var">p</span><sup>guess</sup>) ≥ <span class="var">H</span>(<span class="var">p</span><sup>*</sup>, <span class="var">p</span><sup>guess</sup>) &nbsp;and&nbsp; Δ<span class="var">t</span> ≥ <span class="var">G</span>(<span class="var">p</span><sup>*</sup>, <span class="var">p</span><sup>guess</sup>)</div>
+<table class="data">
+  <thead>
+    <tr><th>From → to</th><th>Hits <span class="var">H</span></th><th>Gap <span class="var">G</span> (s)</th><th>Why</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>anything → Video streaming</td><td class="num">1</td><td class="num">0</td><td>Enter video immediately</td></tr>
+    <tr><td>Gaming &amp; calls → Video streaming</td><td class="num">1</td><td class="num">0</td><td>YouTube while a call app is open</td></tr>
+    <tr><td>Video streaming → Everyday browsing</td><td class="num">1</td><td class="num">0</td><td>Drop video as soon as the pull stops</td></tr>
+    <tr><td>Video streaming → Big downloads</td><td class="num">2</td><td class="num">8</td><td>Do not confuse a 1080p spike with a file grab</td></tr>
+    <tr><td>anything → Gaming &amp; calls</td><td class="num">2</td><td class="num">8</td><td>Need two ticks so leftover UDP is not a “call”</td></tr>
+    <tr><td>anything → Big downloads</td><td class="num">2</td><td class="num">6</td><td>Need a sustained bulk</td></tr>
+    <tr><td>non-browsing → Everyday browsing</td><td class="num">1</td><td class="num">2</td><td>Come back to idle after a short pause</td></tr>
+    <tr><td>any other pair</td><td class="num">2</td><td class="num">6</td><td>Default dampening</td></tr>
+  </tbody>
+</table>
+<p>This hysteresis is per device (your PC vs a phone) and also on the host-wide Auto line. Switching the SAW winner still uses the committed <span class="var">p</span><sup>*</sup>, not the in-flight “leaning …” guess.</p>
+<p class="simple"><strong>In simple terms:</strong> Video is allowed to turn on and off in one look, because a paused YouTube tab should not keep the streaming weights. Calls and downloads wait for a second look so a single UDP blip or speed-test spike does not move you. After that, SAW can change VPN.</p>
+
+<h2>7. How the profile switch changes the VPN</h2>
+<p>Committed Auto mode selects the SAW weight vector (Latency, Jitter, Loss, Throughput index, Reorder, MOS, MTU):</p>
+<table class="data">
+  <thead>
+    <tr><th>Auto mode</th><th>Weights <span class="var">w</span> (%)</th><th>What the VPN ranking now cares about</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Everyday browsing</td><td>15, 15, 15, 15, 10, <strong>20</strong>, 10</td><td>Even QoS, MOS first — usually WireGuard</td></tr>
+    <tr><td>Gaming &amp; calls</td><td><strong>35</strong>, <strong>30</strong>, 10, 5, 5, 10, 5</td><td>Latency + jitter — WireGuard / Nebula / IKEv2</td></tr>
+    <tr><td>Video streaming</td><td>5, 10, <strong>35</strong>, <strong>25</strong>, 5, 15, 5</td><td>Loss + throughput index — OpenVPN / SoftEther / IKEv2</td></tr>
+    <tr><td>Big downloads</td><td>5, 5, 10, <strong>40</strong>, 5, 5, <strong>30</strong></td><td>Throughput index + MTU — SSTP / OpenConnect / OpenVPN</td></tr>
+  </tbody>
+</table>
+<p>Then the SAW score is unchanged from the companion write-up:</p>
+<div class="eq"><span class="var">S</span> = Σ<sub><span class="var">k</span>=1</sub><sup>7</sup> <span class="var">n</span><sub><span class="var">k</span></sub> <span class="var">w</span><sub><span class="var">k</span></sub> + 0.03·(sec/5) + 0.03·(rel/5) + <span class="var">A</span></div>
+<div class="eq"><span class="var">i</span><sup>*</sup> = arg&nbsp;max<sub><span class="var">i</span></sub> <span class="var">S</span><sub><span class="var">i</span></sub></div>
+<p>A per-user Fail mark still does <span class="var">S</span><sub>fail</sub> = 0.05 <span class="var">S</span> on that path only; the tunnel stays up.</p>
+<p class="simple"><strong>In simple terms:</strong> Detecting “Video streaming” does not mean “force OpenVPN.” It means “score every VPN as if loss and steady throughput matter more than ping.” Detecting “Gaming &amp; calls” means “score them as if ping and jitter matter most.” The path with the best score under those weights is the one Auto switches to.</p>
+
+<h2>8. Worked examples</h2>
+<table class="data">
+  <thead>
+    <tr><th>What you are doing</th><th>Typical signals</th><th>Guess after votes</th><th>Then SAW uses</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Idle, or Discord chat + extra tabs</td>
+      <td><span class="var">r</span> ≈ 0.1–0.4, little UDP, maybe discord.com</td>
+      <td><span class="var">V</span> stays below 2.5 → Everyday browsing</td>
+      <td>balanced weights</td>
+    </tr>
+    <tr>
+      <td>YouTube / Netflix actually playing</td>
+      <td>0.22 ≤ <span class="var">r</span> &lt; 6, one-way download, often UDP/443 or googlevideo</td>
+      <td>watching → Video streaming (1 tick)</td>
+      <td>streaming weights</td>
+    </tr>
+    <tr>
+      <td>Discord voice or Go Live (no YouTube)</td>
+      <td>bidir UDP or upload_heavy, discord.media / rtc</td>
+      <td>call_active → Gaming &amp; calls (2 ticks, 8 s gap)</td>
+      <td>gaming weights</td>
+    </tr>
+    <tr>
+      <td>Steam download / large file</td>
+      <td><span class="var">r</span> ≥ 8 or two samples ≥ 6, TCP-ish</td>
+      <td>bulk → Big downloads (2 ticks, 6 s gap)</td>
+      <td>downloads weights</td>
+    </tr>
+  </tbody>
+</table>
+<p class="simple"><strong>In simple terms:</strong> Auto watches the shape of the traffic, not the app window. A quiet Discord window is browsing. A live call is gaming-weights. A playing video is streaming-weights. A big file grab is download-weights. After that, SAW still picks the VPN.</p>
+</body>
+</html>

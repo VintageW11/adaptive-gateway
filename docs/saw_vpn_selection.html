@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SAW VPN selection — formulas and weights</title>
+<style>
+  @page { size: A4; margin: 22mm 20mm; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 12pt;
+    line-height: 1.45;
+    color: #111;
+  }
+  h1 { font-size: 16pt; text-align: center; margin: 0 0 10pt; }
+  h2 { font-size: 13pt; margin: 16pt 0 8pt; page-break-after: avoid; }
+  p { margin: 0 0 8pt; }
+  .eq {
+    display: block;
+    text-align: center;
+    margin: 12pt 0;
+    font-size: 12.5pt;
+  }
+  .eqarray {
+    margin: 12pt auto;
+    border-collapse: collapse;
+    font-size: 12.5pt;
+  }
+  .eqarray td {
+    border: none;
+    padding: 1pt 6pt;
+    vertical-align: baseline;
+  }
+  .eqarray td.lhs { text-align: right; white-space: nowrap; }
+  .eqarray td.eq { text-align: center; padding: 1pt 4pt; }
+  .eqarray td.rhs { text-align: left; }
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8pt 0 12pt;
+    font-size: 10.5pt;
+    page-break-inside: avoid;
+  }
+  table.data th, table.data td {
+    border: 1px solid #444;
+    padding: 4pt 6pt;
+    vertical-align: top;
+    text-align: left;
+  }
+  table.data th { background: #efefef; font-weight: bold; }
+  td.num { text-align: right; white-space: nowrap; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 10.5pt; }
+  .var { font-style: italic; font-family: "Times New Roman", Times, serif; }
+</style>
+</head>
+<body>
+<h1>SAW VPN selection — formulas and weights</h1>
+
+<p>The gateway picks the VPN with the <strong>highest SAW score</strong> on the current traffic profile. That is the implementation in <code>saw.py</code> / <code>app.py</code> — nothing on the lab was changed.</p>
+
+<h2>Decision rule</h2>
+<p>For every enabled path <span class="var">i</span>,</p>
+<div class="eq"><span class="var">i</span><sup>*</sup> = arg&nbsp;max<sub><span class="var">i</span></sub> <span class="var">S</span><sub><span class="var">i</span></sub></div>
+<p>A Fail mark multiplies that path’s score by 0.05 (tunnels stay up). Auto does not invent a fifth formula; it only chooses one of the four weight vectors below (Everyday browsing, Gaming &amp; calls, Video streaming, Big downloads).</p>
+
+<h2>Metrics (same order as the weights)</h2>
+<p>Live values come from two ICMP pings to <code>8.8.8.8</code> on that tunnel. If the probe fails, the <strong>characteristic table</strong> is used instead.</p>
+<table class="data">
+  <thead>
+    <tr><th>Symbol</th><th>Metric</th><th>Live source</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="var">L</span></td><td>Latency (ms)</td><td>mean RTT</td></tr>
+    <tr><td><span class="var">J</span></td><td>Jitter (ms)</td><td>stdev of the two RTTs, capped at 5 ms</td></tr>
+    <tr><td><span class="var">P</span></td><td>Loss (%)</td><td>ping loss</td></tr>
+    <tr>
+      <td><span class="var">T</span></td>
+      <td>Throughput index</td>
+      <td><span class="var">T</span> = max(100 − 2<span class="var">P</span>, 0.1) — not iperf / not Mbps</td>
+    </tr>
+    <tr>
+      <td><span class="var">R</span></td>
+      <td>Reorder (%)</td>
+      <td><span class="var">R</span> = min(0.5<span class="var">P</span>, 100)</td>
+    </tr>
+    <tr>
+      <td><span class="var">M</span></td>
+      <td>MOS</td>
+      <td><span class="var">M</span> = clip(4.5 − <span class="var">L</span>/150 − <span class="var">J</span>/40 − <span class="var">P</span>/25, 1, 4.5)</td>
+    </tr>
+    <tr><td><span class="var">U</span></td><td>MTU</td><td>1400 if a DF ping of 1372 bytes succeeds; else table MTU</td></tr>
+  </tbody>
+</table>
+<p>On a <strong>live</strong> sample, latency and jitter are floored so lab sub-ms pings cannot explode the inverse terms:</p>
+<div class="eq"><span class="var">L</span> ← max(<span class="var">L</span>, 10),&emsp;<span class="var">J</span> ← max(<span class="var">J</span>, 3)</div>
+
+<h2>Normalization (benefit form)</h2>
+<table class="eqarray">
+  <tr>
+    <td class="lhs"><span class="var">n</span><sub><span class="var">L</span></sub></td>
+    <td class="eq">=</td>
+    <td class="rhs">10 / max(<span class="var">L</span>, 0.1)</td>
+  </tr>
+  <tr>
+    <td class="lhs"><span class="var">n</span><sub><span class="var">J</span></sub></td>
+    <td class="eq">=</td>
+    <td class="rhs">5 / max(<span class="var">J</span>, 0.01)</td>
+  </tr>
+  <tr>
+    <td class="lhs"><span class="var">n</span><sub><span class="var">P</span></sub></td>
+    <td class="eq">=</td>
+    <td class="rhs">(100 − <span class="var">P</span>) / 100</td>
+  </tr>
+  <tr>
+    <td class="lhs"><span class="var">n</span><sub><span class="var">T</span></sub></td>
+    <td class="eq">=</td>
+    <td class="rhs"><span class="var">T</span> / 100</td>
+  </tr>
+  <tr>
+    <td class="lhs"><span class="var">n</span><sub><span class="var">R</span></sub></td>
+    <td class="eq">=</td>
+    <td class="rhs">(100 − <span class="var">R</span>) / 100</td>
+  </tr>
+  <tr>
+    <td class="lhs"><span class="var">n</span><sub><span class="var">M</span></sub></td>
+    <td class="eq">=</td>
+    <td class="rhs"><span class="var">M</span> / 5</td>
+  </tr>
+  <tr>
+    <td class="lhs"><span class="var">n</span><sub><span class="var">U</span></sub></td>
+    <td class="eq">=</td>
+    <td class="rhs"><span class="var">U</span> / 1500</td>
+  </tr>
+</table>
+<p>Lower <span class="var">L, J, P, R</span> and higher <span class="var">T, M, U</span> raise <span class="var">n</span>.</p>
+
+<h2>SAW score</h2>
+<p>Weights <span class="var">w</span> are normalized so Σ <span class="var">w</span><sub><span class="var">k</span></sub> = 1.</p>
+<div class="eq"><span class="var">S</span> = Σ<sub><span class="var">k</span>=1</sub><sup>7</sup> <span class="var">n</span><sub><span class="var">k</span></sub> <span class="var">w</span><sub><span class="var">k</span></sub> &nbsp;+&nbsp; 0.03 · (sec / 5) &nbsp;+&nbsp; 0.03 · (rel / 5) &nbsp;+&nbsp; <span class="var">A</span></div>
+<p>Protocol security/reliability (<code>sec</code>, <code>rel</code>) add at most 0.06. Affinity <span class="var">A</span> is a <strong>capped tie-breaker</strong>, not a personality override:</p>
+<div class="eq"><span class="var">A</span> = min(0.02 · <span class="var">a</span><sub>raw</sub>, 0.08)</div>
+<p>So even Gaming’s WireGuard raw affinity 3.5 only adds 0.07. A clear live latency gap still wins.</p>
+<p>Simulated failure:</p>
+<div class="eq"><span class="var">S</span><sub>fail</sub> = 0.05 <span class="var">S</span></div>
+
+<h2>Profile weights (what actually tips the scale)</h2>
+<p>Order: Latency, Jitter, Loss, Throughput, Reorder, MOS, MTU.</p>
+<table class="data">
+  <thead>
+    <tr><th>Profile (UI name)</th><th><span class="var">w</span></th><th>What wins</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Everyday browsing (<code>balanced</code>)</td>
+      <td>15, 15, 15, 15, 10, <strong>20</strong>, 10</td>
+      <td>MOS + even QoS. Table/live both favor <strong>WireGuard</strong>, then IKEv2, SoftEther.</td>
+    </tr>
+    <tr>
+      <td>Gaming &amp; calls (<code>gaming</code>)</td>
+      <td><strong>35</strong>, <strong>30</strong>, 10, 5, 5, 10, 5</td>
+      <td>Latency + jitter. <strong>WireGuard / Nebula / IKEv2</strong>. SSTP is almost excluded.</td>
+    </tr>
+    <tr>
+      <td>Video streaming (<code>streaming</code>)</td>
+      <td>5, 10, <strong>35</strong>, <strong>25</strong>, 5, 15, 5</td>
+      <td>Loss + throughput index. <strong>OpenVPN / SoftEther / IKEv2</strong>.</td>
+    </tr>
+    <tr>
+      <td>Big downloads (<code>downloads</code>)</td>
+      <td>5, 5, 10, <strong>40</strong>, 5, 5, <strong>30</strong></td>
+      <td>Throughput index + MTU. <strong>SSTP / OpenConnect / OpenVPN</strong>.</td>
+    </tr>
+  </tbody>
+</table>
+<p>Custom sliders are the same seven weights, renormalized to 100%.</p>
+
+<h2>Affinity after scale (max add-on 0.08)</h2>
+<table class="data">
+  <thead>
+    <tr><th>Path</th><th>Browsing</th><th>Gaming</th><th>Streaming</th><th>Downloads</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>WireGuard</td><td class="num">0.024</td><td class="num"><strong>0.070</strong></td><td class="num">0.024</td><td class="num">0.012</td></tr>
+    <tr><td>IKEv2</td><td class="num">0.022</td><td class="num">0.036</td><td class="num">0.044</td><td class="num">0.030</td></tr>
+    <tr><td>OpenVPN</td><td class="num">0.018</td><td class="num">0.006</td><td class="num"><strong>0.056</strong></td><td class="num">0.056</td></tr>
+    <tr><td>SoftEther</td><td class="num">0.020</td><td class="num">0.016</td><td class="num">0.052</td><td class="num">0.040</td></tr>
+    <tr><td>ZeroTier</td><td class="num">0.016</td><td class="num">0.030</td><td class="num">0.020</td><td class="num">0.014</td></tr>
+    <tr><td>SSTP</td><td class="num">0.012</td><td class="num">0.002</td><td class="num">0.030</td><td class="num"><strong>0.068</strong></td></tr>
+    <tr><td>OpenConnect</td><td class="num">0.014</td><td class="num">0.008</td><td class="num">0.036</td><td class="num">0.060</td></tr>
+    <tr><td>Nebula</td><td class="num">0.020</td><td class="num">0.060</td><td class="num">0.028</td><td class="num">0.016</td></tr>
+  </tbody>
+</table>
+
+<h2>Characteristic table (when ping fails)</h2>
+<p>(<span class="var">L, J, P, T, R, M, U</span>):</p>
+<table class="data">
+  <thead>
+    <tr><th>Path</th><th>Values</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>WireGuard</td><td>38 ms, 3, 0%, 100, 0, 4.4, 1420</td></tr>
+    <tr><td>IKEv2</td><td>50, 4, 0, 95, 0, 4.2, 1360</td></tr>
+    <tr><td>OpenVPN</td><td>90, 10, 0.2, 80, 0, 3.9, 1400</td></tr>
+    <tr><td>SoftEther</td><td>70, 6, 0.1, 88, 0, 4.0, 1400</td></tr>
+    <tr><td>ZeroTier</td><td>60, 8, 0.5, 85, 1, 3.8, 1380</td></tr>
+    <tr><td>SSTP</td><td>105, 12, 0.3, 72, 0, 3.7, 1350</td></tr>
+    <tr><td>OpenConnect</td><td>85, 9, 0.2, 78, 0, 3.8, 1360</td></tr>
+    <tr><td>Nebula</td><td>45, 5, 0.1, 92, 0, 4.1, 1400</td></tr>
+  </tbody>
+</table>
+<p>That is why browsing/gaming usually land on <strong>WireGuard</strong>: lowest <span class="var">L</span> and <span class="var">J</span>, highest MOS, and those metrics carry most of the weight. Streaming/downloads can prefer TCP-ish paths because loss, <span class="var">T</span>, and MTU outweigh latency. Fail does not change the formula; it only scales that path’s <span class="var">S</span> down so the next-highest SAW score is selected.</p>
+</body>
+</html>

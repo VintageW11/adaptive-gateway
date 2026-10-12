@@ -1,0 +1,13 @@
+[Unit]
+Description=AutoVPN port-80 name stays autovpn.lab (REDIRECT to :5006)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/user/adaptive-gateway/scripts/autovpn-port80-redirect.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

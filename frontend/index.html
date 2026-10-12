@@ -1,0 +1,3618 @@
+<!DOCTYPE html>
+<html lang="en" class="simple-mode">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutoVPN</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* visual 2026-09-17 tech-green fit */
+    :root {
+      --bg: #101412;
+      --panel: #171c19;
+      --panel-2: #1d2420;
+      --input: #252c28;
+      --ink: #e8eee9;
+      --text: #e8eee9;
+      --muted: #8b968e;
+      --green: #2f9e57;
+      --green-hover: #3cb56a;
+      --danger: #d45b5b;
+      --warn: #d4b45a;
+      --accent: #3dcc7a;
+      --blue: #3d7ec9;
+      --radius: 12px;
+      --line: #2a332e;
+      --shadow: 0 18px 48px rgba(8, 14, 10, .55);
+      --inkbar: #0e1311;
+      --cream: #e8eee9;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      background:
+        radial-gradient(900px 480px at 12% -8%, #1b2a22 0%, transparent 55%),
+        radial-gradient(800px 420px at 110% 8%, #182018 0%, transparent 50%),
+        #0c0f0d;
+      color: var(--text);
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      font-variant-numeric: tabular-nums;
+    }
+    body::before {
+      content: "";
+      position: fixed; inset: 0; pointer-events: none; z-index: 8; opacity: .04;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
+    }
+    .shell {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      overflow-x: hidden;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+    }
+    .titlebar {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 14px 20px 12px; gap: 12px; flex-wrap: wrap;
+      background: linear-gradient(180deg, #141c18 0%, #0e1311 100%);
+      border-bottom: 1px solid rgba(61, 204, 122, .35);
+      box-shadow: 0 1px 0 rgba(61, 204, 122, .08), 0 12px 32px rgba(0, 0, 0, .25);
+      font-size: 12px; color: #c5cec8;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      font-weight: 600;
+      min-width: 0;
+    }
+    .mast-mark { color: #e8eee9; white-space: nowrap; }
+    .mast-note { color: #7d8b82; letter-spacing: .12em; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .win-dots { display: none; }
+    .view {
+      display: none; flex: 1;
+      width: min(960px, calc(100% - 32px));
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+    .view.active { display: flex; flex-direction: column; }
+    .brand {
+      display: inline-flex; flex-direction: column; line-height: .82;
+      font-weight: 700; letter-spacing: 0;
+    }
+    .brand .auto {
+      font-size: 13px; font-weight: 600; letter-spacing: .18em;
+      text-transform: uppercase; color: var(--accent);
+    }
+    .brand .vpn {
+      font-size: 56px; font-style: italic; font-weight: 700;
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      color: var(--text);
+    }
+    .login-wrap {
+      flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 132px) minmax(0, 1fr); gap: 24px;
+      align-items: center; max-width: min(560px, 100%); margin: 24px auto 0;
+    }
+    #view-login, #view-signup { position: relative; justify-content: center; padding-bottom: 72px; }
+    #view-login .footer-bar, #view-signup .footer-bar {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: 16px 0 24px;
+    }
+    .user-icon {
+      width: 118px; height: 118px; border: 1px solid rgba(61, 204, 122, .35);
+      border-radius: 16px;
+      position: relative; background: #121816;
+      box-shadow: inset 0 0 24px rgba(47, 158, 87, .12), 0 10px 28px rgba(0, 0, 0, .35);
+    }
+    .user-icon::before {
+      content: "AV";
+      position: absolute; inset: 0;
+      display: grid; place-items: center;
+      width: auto; height: auto; border: 0; border-radius: 0;
+      left: 0; top: 0; transform: none;
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      font-style: italic; font-size: 42px; font-weight: 700;
+      color: var(--accent);
+    }
+    .user-icon::after { display: none; content: none; }
+    .welcome-row { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 8px; flex-wrap: wrap; min-width: 0; }
+    .welcome-row h1 {
+      margin: 0; font-size: 18px; font-weight: 500; color: var(--muted);
+      letter-spacing: .04em; text-transform: uppercase;
+    }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; letter-spacing: .04em; }
+    input[type=text], input[type=password], select, textarea {
+      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid #3a4540;
+      background: var(--input); color: #fff; font-size: 15px; outline: none;
+      font-family: inherit;
+      transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+    }
+    textarea { min-height: 110px; resize: vertical; line-height: 1.4; }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(61, 204, 122, .18);
+    }
+    .btn {
+      border: 0; border-radius: 9px; padding: 12px 16px; font-weight: 600;
+      cursor: pointer; font-size: 15px; font-family: inherit;
+      transition: transform .2s var(--ease), background .2s ease, box-shadow .2s var(--ease), opacity .2s ease;
+    }
+    .btn-green {
+      background: var(--green); color: #f4fff8; width: 100%; margin-top: 14px;
+      box-shadow: 0 8px 20px rgba(47, 158, 87, .28);
+    }
+    .btn-green:hover { background: var(--green-hover); transform: translateY(-1px); box-shadow: 0 12px 24px rgba(47, 158, 87, .36); }
+    .btn-green:active { transform: scale(0.98); }
+    .btn-blue { background: var(--blue); color: #f4f8ff; }
+    .btn-danger { background: var(--danger); color: #fff8f8; }
+    .btn-ghost { background: transparent; color: #d5ddd8; border: 1px solid var(--line); }
+    .btn-ghost:hover { border-color: #4a5a52; background: rgba(255,255,255,.03); }
+    .btn-sm { padding: 8px 12px; font-size: 13px; width: auto; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+    .hint { margin-top: 12px; font-size: 13px; color: #ccc; }
+    .hint a { color: #fff; text-decoration: underline; cursor: pointer; }
+    .error { color: #ff6b6b; font-size: 13px; min-height: 18px; margin-top: 8px; }
+    .footer-bar {
+      margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end;
+      padding-top: 28px; color: #bbb; font-size: 13px;
+      gap: 12px; flex-wrap: wrap; min-width: 0;
+    }
+    .footer-bar span { min-width: 0; overflow-wrap: anywhere; }
+    .credit { font-size: 11px; color: #777; letter-spacing: .08em; text-transform: uppercase; }
+    .onboard {
+      flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;
+      text-align: center; gap: 28px;
+    }
+    .onboard p { font-size: 22px; max-width: 560px; margin: 0; line-height: 1.35; }
+    .dots { display: flex; gap: 8px; }
+    .dots i { width: 18px; height: 4px; border-radius: 999px; background: #3a4540; display: block; transition: background .2s var(--ease), transform .2s var(--ease); }
+    .dots i.on { background: var(--accent); transform: none; }
+    .next-link {
+      align-self: flex-end; background: none; border: 0; color: #eee;
+      font-size: 16px; cursor: pointer; padding: 8px 4px;
+    }
+    .topnav {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;
+      gap: 10px; flex-wrap: wrap;
+    }
+    .topnav .left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+    .topnav-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+    .pill {
+      font-size: 11px; padding: 4px 10px; border-radius: 999px;
+      background: #243028; color: var(--accent); border: 1px solid #2f5;
+      letter-spacing: .08em; font-weight: 600;
+    }
+    .pill.admin { background: #2a2430; color: #c9a0ff; border-color: #864; }
+    .grid-2 { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 16px; }
+    @media (max-width: 900px) {
+      .login-wrap, .grid-2 { grid-template-columns: 1fr; }
+      .shell { margin: 0; min-height: 100dvh; }
+      .view { width: min(960px, calc(100% - 24px)); padding: 20px 0 32px; }
+      .titlebar { padding: 12px 16px 10px; gap: 8px; }
+      .mast-note { display: none; }
+      .topnav { flex-wrap: wrap; gap: 10px; }
+      .topnav-actions { width: 100%; justify-content: flex-start; }
+      .btn-row .btn { min-width: 0; min-height: 44px; }
+      .device-row { min-height: 56px; }
+      .brand .vpn { font-size: 40px; }
+      .hero-vpn { font-size: 24px; }
+      .fail-grid { grid-template-columns: 1fr; }
+      .calc-log { font-size: 10.5px; }
+    }
+    .btn:focus-visible, input:focus-visible, select:focus-visible, .linkish:focus-visible, .next-link:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .view-banner, .gw-banner, .empty-state {
+      margin: 0 0 14px; padding: 12px 14px; border-radius: 10px;
+      font-size: 13px; line-height: 1.45;
+    }
+    .view-banner.warn, .gw-banner, .empty-state.warn {
+      background: #2a1e14; border: 1px solid #864; color: #f4d9a8;
+    }
+    .view-banner.info, .empty-state {
+      background: #14241a; border: 1px solid #2f5; color: #cfe;
+    }
+    .view-banner.bad {
+      background: #2a1414; border: 1px solid #633; color: #ffb0b0;
+    }
+    .badge-live { background: #143d28; color: var(--accent); }
+    .badge-baseline { background: #2a2a20; color: #ccb86a; }
+    .badge-mixed { background: #1a2430; color: #9cf; }
+    .qos-line { font-size: 12px; color: #9ab; margin: 6px 0 0; }
+    .card {
+      background: var(--panel-2); border: 1px solid #333; border-radius: var(--radius); padding: 16px 16px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+      transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+      min-width: 0; overflow: hidden;
+    }
+    .card h3 {
+      margin: 0 0 12px; font-size: 12px; color: #aaa; font-weight: 600;
+      letter-spacing: .12em; text-transform: uppercase;
+    }
+    .hero-status {
+      padding: 22px 24px; border-radius: 14px; margin: 0 0 16px;
+      background: linear-gradient(135deg, #1a2a20 0%, #1e1e1e 70%);
+      border: 1px solid #2f4;
+      box-shadow: 0 0 0 1px rgba(61, 204, 122, .08), 0 16px 36px rgba(0, 0, 0, .28);
+    }
+    .hero-status.flash { animation: pathFlash .9s ease; }
+    @keyframes pathFlash {
+      0% { box-shadow: 0 0 0 0 rgba(0,255,136,.35); }
+      100% { box-shadow: 0 0 0 12px rgba(0,255,136,0); }
+    }
+    .hero-kicker { font-size: 12px; color: var(--muted); margin-bottom: 4px; letter-spacing: .1em; text-transform: uppercase; }
+    .hero-vpn {
+      font-size: clamp(22px, 4vw, 32px); font-weight: 700; color: var(--accent);
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif; font-style: italic;
+      letter-spacing: .02em; overflow-wrap: anywhere;
+    }
+    .hero-quality {
+      margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      font-size: 14px; color: #ccc;
+    }
+    .badge {
+      display: inline-block; padding: 4px 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    }
+    .badge-excellent { background: #143d28; color: var(--accent); }
+    .badge-good { background: #1e3a20; color: #7dffa8; }
+    .badge-fair { background: #3a3214; color: var(--warn); }
+    .badge-poor { background: #3a1414; color: #ff8a8a; }
+    .badge-switched { background: #3a3214; color: var(--warn); }
+    .profile-meta {
+      margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+      background: #1a1a1a; border: 1px solid #333; font-size: 13px; color: var(--muted);
+      line-height: 1.45;
+    }
+    .profile-meta .prefers { color: var(--accent); margin-top: 4px; }
+    .auto-status {
+      margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+      background: #14241a; border: 1px solid #2f5; color: #cfe; font-size: 13px;
+    }
+    .auto-status strong { color: var(--accent); }
+    .device-chip {
+      margin-top: 10px; font-size: 13px; color: #9ab;
+    }
+    .device-chip strong { color: #fff; }
+    .device-row {
+      display: flex; justify-content: space-between; gap: 12px; align-items: center;
+      min-width: 0; flex-wrap: wrap;
+      padding: 12px; border: 1px solid #333; border-radius: 10px; margin-bottom: 8px;
+      background: #1a1a1a; cursor: pointer; transition: border-color .2s var(--ease), background .2s var(--ease), transform .2s var(--ease);
+    }
+    .device-row:hover { border-color: #2f5; background: rgba(0,255,136,.06); transform: translateY(-1px); }
+    .device-row .name { font-weight: 600; }
+    .device-row .meta { font-size: 12px; color: #888; margin-top: 3px; }
+    .device-row.offline { opacity: .45; }
+    .pick-row {
+      display: flex; justify-content: space-between; gap: 12px; align-items: center;
+      padding: 14px 12px; border-radius: 10px; margin-bottom: 8px;
+      background: #1a1a1a; border: 1px solid #333;
+      transition: border-color .2s var(--ease), background .2s var(--ease);
+      min-width: 0; flex-wrap: wrap;
+    }
+    .pick-row > div:first-child { min-width: 0; flex: 1 1 160px; }
+    .pick-name, .pick-sub { overflow-wrap: anywhere; }
+    .pick-row.selected {
+      background: rgba(0,255,136,.08); border-color: #2f5;
+      border-left: 4px solid var(--accent);
+    }
+    .pick-name { font-weight: 600; font-size: 15px; }
+    .pick-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .pick-right { text-align: right; flex: 0 0 auto; }
+    .fit-bars {
+      display: flex; gap: 3px; justify-content: flex-end; margin-bottom: 4px;
+    }
+    .fit-bars i {
+      width: 8px; height: 14px; border-radius: 2px; background: #333; display: block;
+    }
+    .fit-bars i.on { background: var(--accent); }
+    .fit-label { font-size: 12px; color: var(--muted); }
+    .details-panel {
+      display: none; margin-top: 10px; padding-top: 10px;
+      border-top: 1px dashed #444;
+    }
+    .details-panel.open { display: block; }
+    .calc-log {
+      max-height: min(280px, 42vh); overflow: auto; background: #101410; border-radius: 8px;
+      padding: 10px 12px; font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+      font-size: 11px; line-height: 1.5; color: #9aa89e; white-space: pre-wrap;
+      overflow-wrap: anywhere; word-break: break-word;
+      border: 1px solid var(--line);
+      overflow-anchor: none;
+      overscroll-behavior: contain;
+    }
+    .calc-log span { display: block; }
+    .calc-log .cycle-head { color: var(--accent); font-weight: 500; }
+    .calc-log .winner { color: #8ee4ae; }
+    .calc-log .muted { color: #5c665f; }
+    .calc-log .switch-why { color: #b7c4bb; }
+    .calc-log .fail { color: var(--danger); }
+    .live-log {
+      display: none; margin-top: 8px; max-height: 220px; overflow: auto;
+      background: #101410; border-radius: 8px; padding: 10px 12px;
+      font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-size: 12px;
+      line-height: 1.5; color: #9aa89e; white-space: pre-wrap; border: 1px solid var(--line);
+    }
+    .live-log.open { display: block; }
+    .live-log .switch { color: #7dffa8; }
+    .live-log .still { color: #d4c07a; }
+    .slider-group {
+      display: grid; grid-template-columns: 1fr auto; gap: 4px 12px;
+      align-items: center; margin-bottom: 12px; font-size: 13px;
+    }
+    .slider-group .label-row {
+      grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .slider-group .metric-name { color: #ddd; font-weight: 500; }
+    .slider-group .metric-hint { color: #777; font-size: 11px; }
+    .slider-group .pct {
+      font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; color: var(--accent); min-width: 36px; text-align: right;
+    }
+    .slider-group input[type=range] { width: 100%; grid-column: 1; accent-color: var(--accent); }
+    .budget-bar {
+      height: 8px; border-radius: 999px; background: #333; overflow: hidden; margin: 8px 0 4px;
+    }
+    .budget-bar > span {
+      display: block; height: 100%; background: var(--accent); border-radius: 999px;
+      transition: width .2s var(--ease);
+    }
+    .budget-bar.over > span { background: var(--danger); }
+    .budget-text { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .budget-text strong { color: #ddd; }
+    .custom-sliders { display: none; margin-top: 12px; border-top: 1px solid #444; padding-top: 12px; }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .btn-row .btn { width: auto; flex: 1; min-width: min(140px, 100%); }
+    .linkish {
+      background: none; border: 0; color: var(--muted); text-decoration: underline;
+      cursor: pointer; font-size: 13px; padding: 0; margin-top: 8px;
+    }
+    .linkish:hover { color: #fff; }
+    html.role-admin .admin-only { display: block; }
+    html:not(.role-admin) .admin-only { display: none !important; }
+    .fail-panel { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .fail-kicker {
+      font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); margin: 0 0 8px; font-weight: 600;
+    }
+    .fail-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+    }
+    .fail-btn {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      width: 100%; margin: 0; padding: 9px 11px; border-radius: 8px;
+      border: 1px solid var(--line); background: #151b18; color: var(--text);
+      font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;
+      transition: transform .2s var(--ease), border-color .2s ease, background .2s ease;
+      min-width: 0;
+    }
+    .fail-btn span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .fail-btn .fail-state { flex-shrink: 0; }
+    .fail-btn:hover { border-color: #3d5346; transform: translateY(-1px); }
+    .fail-btn:active { transform: scale(0.98); }
+    .fail-btn[aria-pressed="true"] {
+      background: #2a1616; border-color: #6a3333; color: #f0c8c8;
+    }
+    .fail-btn .fail-state { font-size: 11px; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+    .fail-btn[aria-pressed="true"] .fail-state { color: #e89a9a; }
+    .fail-row { display: flex; gap: 8px; }
+    .fail-row .fail-btn { flex: 1; }
+    .fail-row .isolate-btn { flex: 0 0 auto; width: auto; }
+    .restore-all-btn { width: 100%; margin: 0 0 10px; }
+    .pw-row { display: flex; gap: 8px; align-items: center; }
+    .pw-row input { flex: 1; margin-bottom: 0; }
+    .pw-row .pw-toggle { width: auto; margin: 0; padding: 8px 12px; }
+    .pw-rules { margin: 0 0 10px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+    .pick-row.failed { opacity: .72; }
+    .pick-row.failed .pick-name { text-decoration: line-through; color: #c9b0b0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .table-wrap, .card table { display: block; max-width: 100%; overflow-x: auto; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #333; white-space: nowrap; }
+    th { color: #888; font-weight: 600; }
+    .ok { color: var(--accent); }
+    .bad { color: var(--danger); }
+    .warn { color: var(--warn); }
+    .log {
+      max-height: 180px; overflow: auto; background: #151515; border-radius: 8px;
+      padding: 10px; font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-size: 12px; color: #bbb;
+    }
+    .regime-row {
+      display: flex; justify-content: space-between; gap: 10px; align-items: center;
+      padding: 12px; border-bottom: 1px solid #333; border-radius: 8px; margin-bottom: 4px;
+    }
+    .topnav-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+    .gw-toggle {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 10px; border-radius: 999px; border: 1px solid #333;
+      background: #1a1a1a; user-select: none;
+      max-width: 100%;
+    }
+    .gw-toggle span { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .gw-toggle span.on { color: var(--accent); }
+    .gw-toggle span.off { color: #ff8a8a; }
+    .switch {
+      position: relative; width: 42px; height: 24px; flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+      position: absolute; inset: 0; cursor: pointer; border-radius: 999px;
+      background: #444; transition: .2s var(--ease);
+    }
+    .switch .slider::before {
+      content: ""; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px;
+      background: #fff; border-radius: 50%; transition: .2s var(--ease);
+    }
+    .switch input:checked + .slider { background: var(--green); }
+    .switch input:checked + .slider::before { transform: translateX(18px); }
+    .hero-status.paused {
+      background: linear-gradient(135deg, #2a1a1a 0%, #1e1e1e 70%);
+      border-color: #633;
+    }
+    .loading-overlay {
+      display: none; position: absolute; inset: 0; z-index: 20;
+      background: rgba(18,18,18,.72); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+      border-radius: inherit;
+    }
+    .loading-overlay.show { display: flex; }
+    .user-shell { position: relative; flex: 1; display: flex; flex-direction: column; }
+    .spinner {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 3px solid #333; border-top-color: var(--accent);
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-overlay p { margin: 0; color: #ddd; font-size: 14px; }
+    .device-list { display: flex; flex-direction: column; gap: 8px; }
+    .device-list .device-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: 12px; background: #181818; border: 1px solid #333;
+      cursor: pointer; transition: border-color .2s var(--ease), background .2s var(--ease), transform .2s var(--ease);
+      min-width: 0; flex-wrap: wrap;
+    }
+    .device-list .device-row:hover { border-color: #2f5; background: #1c221e; }
+    .device-list .device-row .name { font-weight: 600; }
+    .device-list .device-row .meta { font-size: 12px; color: #888; margin-top: 2px; }
+    .device-list .device-row.offline { opacity: .55; }
+    .device-list .device-row .device-del {
+      flex-shrink: 0;
+      pointer-events: auto;
+    }
+    .dimmed { opacity: .45; pointer-events: none; }
+
+    html.simple-mode .adv-only { display: none !important; }
+    html.advanced-mode .simple-only { display: none !important; }
+    html.simple-mode body {
+      background:
+        radial-gradient(900px 480px at 12% -8%, #1b2a22 0%, transparent 55%),
+        #0c0f0d;
+    }
+    html.simple-mode .shell {
+      width: 100%;
+      margin: 0;
+      min-height: 100dvh;
+      box-shadow: none;
+      border: 0;
+      background: transparent;
+    }
+    html.simple-mode .view { width: min(640px, calc(100% - 24px)); padding: 28px 0 40px; }
+    html.simple-mode .topnav { margin-bottom: 28px; }
+    html.simple-mode .titlebar { background: linear-gradient(180deg, #141c18 0%, #0e1311 100%); color: #c5cec8; }
+    html.simple-mode .card {
+      padding: 22px 24px;
+      margin-bottom: 18px;
+      border-color: #2c2c2c;
+      background: #1c1c1c;
+    }
+    html.simple-mode .hero-status {
+      background: linear-gradient(135deg, #1a2a20 0%, #1c1c1c 70%);
+      border: 1px solid #2f4;
+      padding: 22px 24px;
+    }
+    html.simple-mode .hero-status.paused {
+      background: linear-gradient(135deg, #2a1a1a 0%, #1c1c1c 70%);
+      border-color: #633;
+    }
+    html.simple-mode .hero-status.flash { animation: none; }
+    html.simple-mode .grid-2 { display: block; }
+    html.simple-mode .pill { display: none; }
+    html.simple-mode .device-row:hover,
+    html.simple-mode .device-list .device-row:hover {
+      border-color: #2f5;
+      background: #1c221e;
+    }
+    html.simple-mode .device-list .device-row { padding: 16px 18px; }
+    .simple-sentence {
+      font-size: 26px; font-weight: 600; line-height: 1.3; margin: 0; color: #fff;
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      overflow-wrap: anywhere;
+    }
+    .simple-status { margin: 12px 0 0; font-size: 14px; color: #9a9a9a; }
+    .remote-hint {
+      display: none;
+      margin: 8px 0 0;
+      font-size: 12px;
+      color: #6e7a74;
+      line-height: 1.4;
+    }
+    .remote-hint.show { display: block; }
+    .remote-limit-banner {
+      display: none;
+      margin: 0;
+      padding: 12px 28px;
+      background: #2a2418;
+      border-bottom: 1px solid #864;
+      color: #f4d9a8;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .remote-limit-banner.show { display: block; }
+    #gw-remote-note {
+      display: none;
+      font-size: 12px;
+      color: #c8c0a8;
+      max-width: 220px;
+      line-height: 1.35;
+    }
+    html.remote-view .gw-toggle { display: none; }
+    html.remote-view #gw-remote-note { display: inline; }
+    html.remote-view .gw-card .switch { display: none; }
+    html.remote-view .delete-account-btn,
+    html.remote-view #logout-admin,
+    html.remote-view #logout-user,
+    html.remote-view #logout-devices { display: none; }
+    .gw-hint { margin: 10px 0 0; font-size: 13px; color: #8a8a8a; line-height: 1.45; }
+    .nav-user { font-size: 13px; color: #aaa; min-width: 0; overflow-wrap: anywhere; }
+    .mode-toggle { font-weight: 600; letter-spacing: .02em; min-width: 108px; }
+    html.simple-mode .gw-card .gw-toggle {
+      padding: 4px 0; border: 0; background: transparent;
+    }
+    html.simple-mode .error { min-height: 16px; }
+    html.simple-mode #profile-meta { display: none; }
+
+    html.admin-view .view {
+      width: min(1080px, calc(100% - 24px));
+    }
+    html.simple-mode.admin-view .view {
+      width: min(640px, calc(100% - 24px));
+    }
+    html.admin-view .shell,
+    html.simple-mode.admin-view .shell {
+      width: 100%;
+    }
+    .acct-crumb {
+      margin: 0 0 14px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      color: #bbb;
+    }
+    .acct-crumb .crumb-link {
+      border: 0;
+      background: none;
+      padding: 0;
+      font: inherit;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      cursor: pointer;
+    }
+    .acct-crumb .crumb-link:hover { text-decoration: underline; }
+    .acct-crumb .crumb-link[aria-current="page"] {
+      color: #fff;
+      cursor: default;
+      text-decoration: none;
+    }
+    .acct-crumb .crumb-sep { color: #666; }
+    .acct-crumb .crumb-name {
+      color: #fff;
+      letter-spacing: .02em;
+      font-weight: 700;
+    }
+    #view-admin { padding-top: 24px; }
+    .admin-tabs {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      margin: 0 0 16px; padding: 4px;
+      background: #161616; border: 1px solid #2e2e2e; border-radius: 12px;
+    }
+    .admin-tab {
+      flex: 1; min-width: 96px; border: 0; background: transparent;
+      color: #9a9a9a; padding: 10px 12px; border-radius: 9px;
+      font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit;
+      transition: background .2s var(--ease), color .2s ease;
+    }
+    .admin-tab:hover { color: #fff; background: #1f1f1f; }
+    .admin-tab.active {
+      background: #2a2a2a; color: #fff;
+      box-shadow: inset 0 0 0 1px #3a3a3a;
+    }
+    .admin-tab .tab-badge {
+      display: inline-block; min-width: 18px; margin-left: 6px;
+      padding: 1px 6px; border-radius: 999px;
+      background: #3a1414; color: #ff8a8a; font-size: 11px;
+    }
+    .admin-tab.active .tab-badge { background: #3a1414; color: #ff8a8a; }
+    .admin-tab .tab-badge[hidden] { display: none; }
+    .admin-pane { display: none; }
+    .admin-pane.active { display: block; }
+    .acct-wrap { position: relative; }
+    .acct-drop {
+      position: absolute; right: 0; top: calc(100% + 8px);
+      min-width: 200px; z-index: 18;
+      background: #222; border: 1px solid #444; border-radius: 12px;
+      padding: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.45);
+    }
+    .acct-drop[hidden] { display: none; }
+    .acct-drop-name { margin-bottom: 8px; font-size: 12px; color: #aaa; }
+    .bug-fab {
+      position: fixed; right: 22px; bottom: 22px; z-index: 40;
+      border-radius: 999px; padding: 12px 16px;
+      background: #1e1e1e; color: #fff; font-weight: 700; font-size: 13px;
+      cursor: pointer; font-family: inherit;
+      border: 1px solid #3a3a3a;
+      box-shadow: 0 10px 28px rgba(0,0,0,.4);
+      transition: border-color .2s var(--ease), color .2s ease, transform .2s var(--ease);
+    }
+    .bug-fab:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+    .bug-fab[hidden] { display: none; }
+    html.simple-mode .bug-fab {
+      background: #1c1c1c; border-color: #333; box-shadow: 0 8px 20px rgba(0,0,0,.35);
+    }
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 60;
+      background: rgba(0,0,0,.58);
+      display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-card {
+      width: min(440px, 100%);
+      background: #1e1e1e; border: 1px solid #333; border-radius: 16px;
+      padding: 20px 22px; box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+    .modal-card h3 { margin: 0 0 8px; font-size: 18px; }
+    .modal-card p { margin: 0 0 14px; color: #aaa; font-size: 14px; line-height: 1.45; }
+    #consent-modal { z-index: 80; background: rgba(6, 10, 8, .78); }
+    #consent-modal .modal-card { width: min(480px, 100%); }
+    .consent-check {
+      display: flex; align-items: flex-start; gap: 10px;
+      margin: 4px 0 16px; color: var(--ink); font-size: 14px; line-height: 1.4;
+      cursor: pointer; user-select: none;
+    }
+    .consent-check input[type=checkbox] {
+      width: 18px; height: 18px; margin: 2px 0 0; flex: 0 0 18px;
+      accent-color: var(--green); cursor: pointer;
+    }
+    .bug-item {
+      padding: 14px; border: 1px solid #333; border-radius: 12px;
+      background: #1a1a1a; margin-bottom: 10px;
+    }
+    .bug-item .bug-head {
+      display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
+    }
+    .bug-item .name { font-weight: 600; }
+    .status-new { color: #9cf; }
+    .status-seen { color: var(--warn); }
+    .status-done { color: var(--accent); }
+    .acct-row-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+    @media (max-width: 900px) {
+      .fail-grid { grid-template-columns: 1fr; }
+      .calc-log { font-size: 10.5px; }
+      .login-wrap { justify-items: start; }
+    }
+    </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="titlebar">
+      <span class="mast-mark">AutoVPN lab</span>
+      <span class="mast-note">one WAN · eight paths</span>
+    </div>
+    <div id="remote-limit-banner" class="remote-limit-banner" hidden role="status">
+      Remote hallway (ZeroTier): AutoVPN UI only. Overlay traffic is about 4 Mbit if you send it - not the house LAN, and not lab Gateway 192.168.50.10.
+    </div>
+
+    <section id="view-login" class="view active">
+      <div class="welcome-row">
+        <h1>Welcome to</h1>
+        <div class="brand"><span class="auto">Auto</span><span class="vpn">VPN.</span></div>
+      </div>
+      <div class="login-wrap">
+        <div class="user-icon" aria-hidden="true"></div>
+        <div>
+          <label for="username">Username</label>
+          <input id="username" type="text" placeholder="Username..." autocomplete="username" />
+          <label for="password">Password</label>
+          <div class="pw-row">
+            <input id="password" type="password" placeholder="Password..." autocomplete="current-password" />
+            <button class="btn btn-ghost pw-toggle" type="button" data-pw-toggle="password">Show</button>
+          </div>
+          <button class="btn btn-green" id="login-btn" type="button">Log in ⏎</button>
+          <div class="error" id="login-error" role="alert" aria-live="polite"></div>
+          <div class="hint">Don't have an account? click <a id="signup-link">here</a></div>
+          <p class="remote-hint" data-remote-hint>Remote hallway · UI only · ~4 Mbit overlay · not house LAN · not lab Gateway .10</p>
+        </div>
+      </div>
+      <div class="footer-bar">
+        <span id="tagline">Pick a mode. We pick the best VPN.</span>
+        <span class="credit">by SuiSSD corp.</span>
+      </div>
+    </section>
+
+    <section id="view-signup" class="view">
+      <div class="welcome-row">
+        <h1>Create</h1>
+        <div class="brand"><span class="auto">Auto</span><span class="vpn">VPN.</span></div>
+      </div>
+      <div class="login-wrap">
+        <div class="user-icon" aria-hidden="true"></div>
+        <div>
+          <label for="signup-username">Username</label>
+          <input id="signup-username" type="text" placeholder="Choose a username..." autocomplete="username" minlength="3" />
+          <label for="signup-password">Password</label>
+          <div class="pw-row">
+            <input id="signup-password" type="password" placeholder="Choose a password..." autocomplete="new-password" />
+            <button class="btn btn-ghost pw-toggle" type="button" data-pw-toggle="signup-password">Show</button>
+          </div>
+          <p class="pw-rules">At least 8 characters, with an uppercase letter, a lowercase letter, a number, and a symbol.</p>
+          <label for="signup-password2">Confirm password</label>
+          <div class="pw-row">
+            <input id="signup-password2" type="password" placeholder="Repeat password..." autocomplete="new-password" />
+            <button class="btn btn-ghost pw-toggle" type="button" data-pw-toggle="signup-password2">Show</button>
+          </div>
+          <button class="btn btn-green" id="signup-btn" type="button">Sign up</button>
+          <div class="error" id="signup-error" role="alert" aria-live="polite"></div>
+          <div class="hint">Already have an account? <a id="back-to-login">Log in</a></div>
+        </div>
+      </div>
+      <div class="footer-bar">
+        <span>New accounts start with a device list - add this PC after signup.</span>
+        <span class="credit">by SuiSSD corp.</span>
+      </div>
+    </section>
+
+    <section id="view-onboard" class="view">
+      <div class="onboard">
+        <div class="brand"><span class="auto">Auto</span><span class="vpn">VPN.</span></div>
+        <p id="onboard-text">Welcome to AutoVPN, where your connection becomes constant.</p>
+        <div class="dots" id="onboard-dots"><i class="on"></i><i></i><i></i></div>
+      </div>
+      <button class="next-link" id="onboard-next">Next →</button>
+    </section>
+
+    <section id="view-devices" class="view">
+      <div class="topnav">
+        <div class="left">
+          <div class="brand" style="transform:scale(.55); transform-origin:left center;"><span class="auto">Auto</span><span class="vpn">VPN.</span></div>
+          <span class="pill adv-only">YOUR DEVICES</span>
+          <span class="nav-user" id="nav-user-devices"></span>
+        </div>
+        <div class="topnav-actions">
+          <button class="btn btn-ghost btn-sm mode-toggle" data-mode-toggle type="button">Advanced</button>
+          <div class="acct-wrap">
+            <button class="btn btn-ghost btn-sm acct-toggle" type="button" aria-haspopup="true" aria-expanded="false">Account</button>
+            <div class="acct-drop" hidden>
+              <div class="acct-drop-name nav-user"></div>
+              <button type="button" class="btn btn-danger btn-sm delete-account-btn" style="width:100%">Delete account</button>
+            </div>
+          </div>
+          <button class="btn btn-ghost" id="logout-devices" type="button">Log out</button>
+        </div>
+      </div>
+      <p class="adv-only" style="margin:0 0 14px;color:var(--muted);font-size:14px">Pick a device to open its dashboard. Rankings and the calc log are for that device only - not the PC you are browsing from.</p>
+
+      <div class="card simple-only" id="simple-now-card">
+        <h3>Right now</h3>
+        <p class="simple-sentence" id="simple-now-text">Checking the connection…</p>
+        <p class="simple-status" id="simple-now-status"></p>
+        <p class="remote-hint" data-remote-hint>Remote hallway · UI only · ~4 Mbit overlay · not house LAN · not lab Gateway .10</p>
+      </div>
+
+      <h3 class="simple-only" style="margin:4px 0 8px;font-size:14px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase">Devices</h3>
+      <p class="simple-only gw-hint" style="margin:0 0 12px">Tap a device to control it.</p>
+      <div id="user-device-list" class="device-list"></div>
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn btn-green" id="add-device-btn" type="button" style="width:auto">+ Add this device</button>
+      </div>
+      <p class="gw-hint" style="margin-top:8px">Binds this PC's current IP to your account only. Delete removes it from the account. Tunnels stay up.</p>
+      <div class="error" id="device-list-error" role="alert" aria-live="polite"></div>
+
+      <div class="card simple-only gw-card" id="simple-gw-card" style="margin-top:18px">
+        <h3>Your connection</h3>
+        <label class="gw-toggle">
+          <span id="gw-label-simple">Connected</span>
+          <span class="switch">
+            <input type="checkbox" id="gateway-toggle-simple" checked role="switch" aria-checked="true" aria-label="Adaptive gateway" />
+            <span class="slider"></span>
+          </span>
+        </label>
+        <p class="gw-hint" id="gw-hint-simple">This account is connected to the gateway.</p>
+        <div class="error" id="simple-gw-error" role="alert" aria-live="polite"></div>
+      </div>
+      <div class="footer-bar">
+        <span id="devices-user-label">Signed in</span>
+        <span class="credit">by SuiSSD corp.</span>
+      </div>
+    </section>
+
+    <section id="view-user" class="view">
+      <div class="user-shell">
+      <div class="loading-overlay" id="loading-overlay" aria-live="polite">
+        <div class="spinner" role="status" aria-label="Loading"></div>
+        <p id="loading-text">Switching mode…</p>
+      </div>
+      <div class="topnav">
+        <div class="left">
+          <div class="brand" style="transform:scale(.55); transform-origin:left center;"><span class="auto">Auto</span><span class="vpn">VPN.</span></div>
+          <span class="pill adv-only">USER</span>
+          <span class="nav-user" id="nav-user-dash"></span>
+          <button class="btn btn-ghost btn-sm" id="back-to-devices" type="button">← Devices</button>
+        </div>
+        <div class="topnav-actions">
+          <button class="btn btn-ghost btn-sm mode-toggle" data-mode-toggle type="button">Advanced</button>
+          <label class="gw-toggle adv-only" title="On: lab clients use Ubuntu as DHCP gateway. Off: internet stays on MikroTik (.1). SAW still ranks protocol paths.">
+            <span id="gw-label">Gateway On</span>
+            <span class="switch">
+              <input type="checkbox" id="gateway-toggle" checked role="switch" aria-checked="true" aria-label="Adaptive gateway" />
+              <span class="slider"></span>
+            </span>
+          </label>
+          <div class="acct-wrap">
+            <button class="btn btn-ghost btn-sm acct-toggle" type="button" aria-haspopup="true" aria-expanded="false">Account</button>
+            <div class="acct-drop" hidden>
+              <div class="acct-drop-name nav-user"></div>
+              <button type="button" class="btn btn-danger btn-sm delete-account-btn" style="width:100%">Delete account</button>
+            </div>
+          </div>
+          <button class="btn btn-ghost" id="logout-user">Log out</button>
+        </div>
+      </div>
+
+      <div class="hero-status" id="route-status">
+        <div class="simple-only">
+          <p class="simple-sentence" id="simple-hero-text">Checking the connection…</p>
+          <p class="simple-status" id="simple-hero-status"></p>
+          <p class="remote-hint" data-remote-hint>Remote hallway · UI only · ~4 Mbit overlay · not house LAN · not lab Gateway .10</p>
+        </div>
+        <div class="adv-only">
+          <div class="hero-kicker" id="hero-kicker">Connected with</div>
+          <div class="hero-vpn" id="hero-vpn">…</div>
+          <div class="hero-quality" id="hero-quality"></div>
+          <div class="qos-line" id="hero-qos">Waiting for live vs baseline…</div>
+          <div id="device-chip" class="device-chip">This device: detecting…</div>
+          <p class="remote-hint adv-only" data-remote-hint>ZeroTier hallway: cafe Wi‑Fi stays yours. UI only. ~4 Mbit if you send overlay traffic - not house LAN, not lab Gateway 192.168.50.10.</p>
+        </div>
+      </div>
+      <div id="view-banner" class="view-banner" hidden></div>
+
+      <div class="grid-2" id="user-main">
+        <div class="card">
+          <h3>What are you doing?</h3>
+          <select id="profile-selector">
+            <option value="auto">Auto (watch the network)</option>
+            <option value="balanced">Everyday browsing</option>
+            <option value="gaming">Gaming & calls</option>
+            <option value="streaming">Video streaming</option>
+            <option value="downloads">Big downloads</option>
+            <option value="custom">Custom priorities</option>
+          </select>
+          <div id="profile-meta" class="profile-meta">
+            <div id="profile-blurb" class="adv-only">Best all-round mix for normal use.</div>
+            <div class="prefers adv-only" id="profile-prefers">Usually picks: WireGuard, IKEv2/IPsec, SoftEther</div>
+            <div id="auto-status" class="auto-status adv-only" style="display:none"></div>
+            <button class="linkish adv-only" id="toggle-live-log" type="button">Hide live activity</button>
+            <div class="live-log open adv-only" id="live-log">Waiting for engine…</div>
+          </div>
+
+          <div id="custom-panel" class="custom-sliders adv-only">
+            <p style="margin:0 0 8px;font-size:13px;color:#bbb">
+              Spend up to <strong style="color:#fff">100 points</strong> across what matters most.
+              Raising one priority uses points from the shared budget.
+            </p>
+            <div class="budget-bar" id="budget-bar"><span id="budget-fill" style="width:100%"></span></div>
+            <div class="budget-text" id="budget-text"><strong>100</strong> / 100 points used</div>
+
+            <div class="slider-group" data-metric="lat">
+              <div class="label-row">
+                <span><span class="metric-name">Latency</span></span>
+                <span class="pct" id="pct-lat">15%</span>
+              </div>
+              <input type="range" id="w-lat" min="0" max="100" value="15" />
+            </div>
+            <div class="slider-group" data-metric="jit">
+              <div class="label-row">
+                <span><span class="metric-name">Jitter</span></span>
+                <span class="pct" id="pct-jit">15%</span>
+              </div>
+              <input type="range" id="w-jit" min="0" max="100" value="15" />
+            </div>
+            <div class="slider-group" data-metric="loss">
+              <div class="label-row">
+                <span><span class="metric-name">Loss</span></span>
+                <span class="pct" id="pct-loss">15%</span>
+              </div>
+              <input type="range" id="w-loss" min="0" max="100" value="15" />
+            </div>
+            <div class="slider-group" data-metric="thr">
+              <div class="label-row">
+                <span><span class="metric-name">Throughput</span></span>
+                <span class="pct" id="pct-thr">15%</span>
+              </div>
+              <input type="range" id="w-thr" min="0" max="100" value="15" />
+            </div>
+            <div class="slider-group" data-metric="reorder">
+              <div class="label-row">
+                <span><span class="metric-name">Reorder</span></span>
+                <span class="pct" id="pct-reorder">10%</span>
+              </div>
+              <input type="range" id="w-reorder" min="0" max="100" value="10" />
+            </div>
+            <div class="slider-group" data-metric="mos">
+              <div class="label-row">
+                <span><span class="metric-name">MOS</span></span>
+                <span class="pct" id="pct-mos">20%</span>
+              </div>
+              <input type="range" id="w-mos" min="0" max="100" value="20" />
+            </div>
+            <div class="slider-group" data-metric="mtu">
+              <div class="label-row">
+                <span><span class="metric-name">MTU</span></span>
+                <span class="pct" id="pct-mtu">10%</span>
+              </div>
+              <input type="range" id="w-mtu" min="0" max="100" value="10" />
+            </div>
+            <button class="btn btn-blue" id="apply-weights" style="width:100%;margin-top:4px">
+              Apply my priorities
+            </button>
+          </div>
+        </div>
+
+        <div class="card adv-only">
+          <h3>Best matches right now</h3>
+          <div class="pick-sub" id="match-tick" style="margin:-4px 0 10px">Waiting for engine…</div>
+          <div class="qos-line" id="qos-line">Scores say whether each path used live QoS or a characteristic fallback.</div>
+          <div id="containers"></div>
+          <button class="linkish" id="toggle-details" type="button">Hide calculations log</button>
+          <div class="details-panel open" id="details-panel">
+            <div class="calc-log" id="calc-log">Waiting for this device's SAW cycles.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="fail-card" style="margin-top:16px">
+        <h3>Simulate path failure</h3>
+        <p class="gw-hint">Fail marks a VPN as down for this account so ranking picks another path. Isolate keeps only the VPN you pick and marks every other path down. Other users keep their own paths. Restore brings one path back. Restore all brings every path back.</p>
+        <button class="btn btn-ghost restore-all-btn" type="button" data-restore-all>Restore all</button>
+        <div class="fail-grid" id="fail-grid"></div>
+      </div>
+
+      <div class="card simple-only gw-card" id="simple-gw-card-user" style="margin-top:8px">
+        <h3>Your connection</h3>
+        <label class="gw-toggle">
+          <span id="gw-label-simple-user">Connected</span>
+          <span class="switch">
+            <input type="checkbox" id="gateway-toggle-simple-user" checked role="switch" aria-checked="true" aria-label="Adaptive gateway" />
+            <span class="slider"></span>
+          </span>
+        </label>
+        <p class="gw-hint" id="gw-hint-simple-user">This account is connected to the gateway.</p>
+        <div class="error" id="simple-gw-error-user" role="alert" aria-live="polite"></div>
+      </div>
+
+      <div class="footer-bar">
+        <span id="tagline-user">Pick a mode. We pick the best protocol path.</span>
+        <span class="credit">by SuiSSD corp.</span>
+      </div>
+      </div>
+    </section>
+
+    <section id="view-admin" class="view">
+      <div class="topnav">
+        <div class="left">
+          <div class="brand" style="transform:scale(.55); transform-origin:left center;"><span class="auto">Auto</span><span class="vpn">VPN.</span></div>
+          <span class="pill admin">ADMIN</span>
+        </div>
+        <div class="topnav-actions">
+          <button class="btn btn-ghost btn-sm mode-toggle" data-mode-toggle type="button">Simple</button>
+          <button class="btn btn-ghost btn-sm" id="admin-open-dash" type="button" title="Host SAW ranking, calc log, and profile switch">Dashboard</button>
+          <label class="gw-toggle" title="On: lab clients use Ubuntu as DHCP gateway. Off: internet stays on MikroTik (.1). SAW still ranks protocol paths.">
+            <span id="gw-label-admin">Gateway On</span>
+            <span class="switch">
+              <input type="checkbox" id="gateway-toggle-admin" checked role="switch" aria-checked="true" aria-label="Adaptive gateway" />
+              <span class="slider"></span>
+            </span>
+          </label>
+          <span id="gw-remote-note">Gateway is lab Wi‑Fi only</span>
+          <div class="acct-wrap">
+            <button class="btn btn-ghost btn-sm acct-toggle" type="button" aria-haspopup="true" aria-expanded="false">Account</button>
+            <div class="acct-drop" hidden>
+              <div class="acct-drop-name nav-user"></div>
+              <button type="button" class="btn btn-danger btn-sm delete-account-btn" style="width:100%">Delete account</button>
+            </div>
+          </div>
+          <button class="btn btn-ghost" id="logout-admin">Log out</button>
+        </div>
+      </div>
+
+      <nav class="admin-tabs" role="tablist" aria-label="Admin sections">
+        <button class="admin-tab active" type="button" role="tab" data-tab="accounts" aria-selected="true">Accounts</button>
+        <button class="admin-tab" type="button" role="tab" data-tab="devices" aria-selected="false">Devices / LAN</button>
+        <button class="admin-tab" type="button" role="tab" data-tab="health" aria-selected="false">Health</button>
+        <button class="admin-tab" type="button" role="tab" data-tab="reports" aria-selected="false">Reports <span id="reports-badge" class="tab-badge" hidden></span></button>
+        <button class="admin-tab" type="button" role="tab" data-tab="tools" aria-selected="false">Tools</button>
+      </nav>
+
+      <div class="admin-pane active" data-pane="accounts">
+        <div class="card" id="admin-accounts-card" style="margin-bottom:16px">
+          <h3 class="acct-crumb" id="admin-accounts-crumb">
+            <button type="button" class="crumb-link" id="admin-acct-crumb-root" aria-current="page">Accounts</button>
+            <span id="admin-acct-crumb-sep" class="crumb-sep" hidden> &gt; </span>
+            <span id="admin-acct-crumb-name" class="crumb-name" hidden></span>
+          </h3>
+          <div id="admin-accounts-list-wrap">
+            <p style="margin:0 0 10px;font-size:13px;color:#999">Search, open devices, or delete a user. The last admin cannot be removed.</p>
+            <input id="admin-account-search" type="text" placeholder="Search username…" style="margin-bottom:12px" />
+            <div id="admin-account-list" class="device-list"></div>
+          </div>
+          <div id="admin-account-devices" hidden>
+            <div id="admin-acct-device-list" class="device-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-pane" data-pane="devices">
+        <div class="card" style="margin-bottom:16px">
+          <h3>Devices</h3>
+          <p style="margin:0 0 10px;font-size:13px;color:#999">Lab DHCP and ZeroTier remotes - click to inspect path.</p>
+          <div id="admin-device-list"></div>
+        </div>
+        <div class="card" id="admin-device-detail" style="display:none;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px">
+            <h3 style="margin:0" id="dev-detail-title">Device</h3>
+            <button class="btn btn-ghost btn-sm" id="dev-detail-close" type="button">Close</button>
+          </div>
+          <div id="dev-detail-body" style="font-size:14px;color:#ccc;line-height:1.5"></div>
+          <div class="btn-row" style="margin-top:12px">
+            <select id="dev-force-regime"></select>
+            <button class="btn btn-green" id="dev-force-btn" style="margin-top:0;flex:0 0 auto">Force VPN</button>
+          </div>
+          <div id="dev-detail-metrics" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div class="admin-pane" data-pane="health">
+        <div class="card" style="margin-bottom:16px">
+          <h3>Lab health</h3>
+          <p style="margin:0 0 8px;font-size:12px;color:#999">Honest snapshot - down stays down. SSTP/OC/Nebula are lab ifaces.</p>
+          <div id="admin-lab"></div>
+          <h3 style="margin-top:16px">VPN paths</h3>
+          <div id="admin-containers"></div>
+          <div class="btn-row">
+            <button class="btn btn-blue" id="refresh-admin">Refresh</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Regime Registry</h3>
+          <table>
+            <thead><tr><th>Name</th><th>Iface</th><th>Score</th><th>Source</th><th>Latency</th><th>Active</th></tr></thead>
+            <tbody id="admin-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-pane" data-pane="reports">
+        <div class="card">
+          <h3>Bug reports</h3>
+          <p style="margin:0 0 12px;font-size:13px;color:#999">Filed from the Report bug button. Mark seen or done, add an optional note.</p>
+          <div id="admin-bug-list"></div>
+        </div>
+      </div>
+
+      <div class="admin-pane" data-pane="tools">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Host profile</h3>
+            <p style="margin:0 0 8px;font-size:12px;color:#999">Switch Auto / Gaming / Streaming / Downloads and watch the Regime Registry winner change.</p>
+            <select id="admin-profile">
+              <option value="auto">Auto (watching)</option>
+              <option value="balanced">Everyday browsing</option>
+              <option value="gaming">Gaming &amp; calls</option>
+              <option value="streaming">Video streaming</option>
+              <option value="downloads">Big downloads</option>
+            </select>
+            <div class="btn-row">
+              <button class="btn btn-blue" id="admin-profile-btn" type="button" style="margin-top:0">Apply host profile</button>
+            </div>
+            <h3 style="margin-top:18px">Force Global Path</h3>
+            <select id="force-regime"></select>
+            <div class="btn-row">
+              <button class="btn btn-green" id="force-btn" style="margin-top:0">Force Handover</button>
+            </div>
+            <p class="fail-kicker">Simulate path failure</p>
+            <p style="margin:0 0 10px;font-size:12px;color:var(--muted)">Marks a VPN failed for this admin account. Other users keep their own paths. Real ifaces stay up. Restore all brings every path back.</p>
+            <button class="btn btn-ghost restore-all-btn" type="button" data-restore-all>Restore all</button>
+            <div class="fail-grid" id="admin-fail-grid"></div>
+            <div class="btn-row">
+              <button class="btn btn-danger" id="admin-fail" type="button" hidden title="legacy WireGuard toggle">Simulate WG down</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Handover Log</h3>
+            <div class="log" id="admin-log">Waiting for events...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bar">
+        <span>Admin · 8 protocol paths on one WAN</span>
+        <span class="credit">by SuiSSD corp.</span>
+      </div>
+    </section>
+  </div>
+
+  <button type="button" class="bug-fab" id="bug-fab" hidden>Report bug</button>
+
+  <div class="modal-backdrop" id="bug-modal" role="dialog" aria-modal="true" aria-labelledby="bug-modal-title">
+    <div class="modal-card">
+      <h3 id="bug-modal-title">Report a bug</h3>
+      <p>Title and a short description. Screenshot upload is skipped in this build.</p>
+      <label for="bug-title">Title</label>
+      <input id="bug-title" type="text" maxlength="200" placeholder="What went wrong?" />
+      <label for="bug-body">Description</label>
+      <textarea id="bug-body" maxlength="4000" placeholder="What did you expect, and what happened?"></textarea>
+      <div class="error" id="bug-error" role="alert" aria-live="polite"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="bug-cancel">Cancel</button>
+        <button type="button" class="btn btn-green" id="bug-submit" style="margin-top:0">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="consent-modal" role="dialog" aria-modal="true" aria-labelledby="consent-title">
+    <div class="modal-card">
+      <h3 id="consent-title">Before you enter</h3>
+      <p>AutoVPN stores account, device, and connection data so it can pick a VPN path for you. That includes your login, bound IP and MAC, ping and quality samples, ranking scores, Fail marks, and activity on this account.</p>
+      <p>This is stored on your account. Another computer using the same login will not see this prompt again.</p>
+      <label class="consent-check" for="consent-check">
+        <input type="checkbox" id="consent-check" />
+        <span>I consent to the collection of this data so I can use AutoVPN.</span>
+      </label>
+      <div class="error" id="consent-error" role="alert" aria-live="polite"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="consent-logout" style="margin-top:0">Log out</button>
+        <button type="button" class="btn btn-green" id="consent-enter" style="margin-top:0" disabled>Enter Dashboard</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="modal-card">
+      <h3 id="confirm-title">Are you sure?</h3>
+      <p id="confirm-body">This cannot be undone.</p>
+      <div class="error" id="confirm-error" role="alert" aria-live="polite"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-ok" style="margin-top:0">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const _h = (location.hostname || "").toLowerCase();
+    const _labName = (
+      _h === "autovpn.lab" || _h === "www.autovpn.lab" || _h === "autovpn"
+      || _h === "192.168.50.10" || _h === "192.168.56.10"
+    );
+    const BACKEND_URL = (_h === "localhost" || _h === "127.0.0.1")
+      ? "http://192.168.50.10:5006"
+      : ((location.port === "5006" || _labName) ? "" : `${location.protocol}//${location.hostname}:5006`);
+
+    const ONBOARD_SLIDES = [
+      "Welcome to AutoVPN - one internet connection, eight protocol paths. We pick the best fit.",
+      "Gaming, streaming, downloads… each mode favors a different protocol on the same WAN.",
+      "Want control? Use Custom and spend 100 priority points your way."
+    ];
+
+    const FRIENDLY_PROFILE = {
+      auto: {
+        blurb: "Watches live traffic and switches modes for you.",
+        prefers: ["Depends on path quality"],
+      },
+      balanced: {
+        blurb: "Best all-round mix for normal browsing and everyday use.",
+        prefers: ["WireGuard", "IKEv2/IPsec", "SoftEther"],
+      },
+      gaming: {
+        blurb: "Favors quick response and smooth timing for games & calls.",
+        prefers: ["WireGuard", "Nebula", "IKEv2/IPsec"],
+      },
+      streaming: {
+        blurb: "Favors a stable path so video keeps playing cleanly.",
+        prefers: ["OpenVPN", "SoftEther", "IKEv2/IPsec"],
+      },
+      downloads: {
+        blurb: "Favors paths that handle big file transfers well.",
+        prefers: ["SSTP", "OpenConnect", "OpenVPN"],
+      },
+      custom: {
+        blurb: "You choose how much each priority matters (100-point budget).",
+        prefers: [],
+      },
+    };
+
+    const WEIGHT_IDS = ["w-lat","w-jit","w-loss","w-thr","w-reorder","w-mos","w-mtu"];
+    const PCT_IDS = ["pct-lat","pct-jit","pct-loss","pct-thr","pct-reorder","pct-mos","pct-mtu"];
+    const BUDGET_TOTAL = 100;
+
+    let onboardIndex = 0;
+    let session = null;
+    let pollTimer = null;
+    let lastActiveName = null;
+    let lastAutoDetected = null;
+    let showDetails = true;
+    let showLiveLog = true;
+    let simulatedDown = [];
+    let failPaths = [];
+    let adjustingSlider = false;
+    let gatewayEnabled = true;
+    let syncingGatewayToggle = false;
+    let myDeviceIp = null;
+    let selectedAdminDevice = null;
+    let selectedAccountId = null;
+    let boundDevice = null;
+    let calcLogLines = [];
+    let lastCalcFingerprint = "";
+    let lastGwError = "";
+    let afterConsent = null;
+    const ADV_KEY = "autovpnAdvanced";
+    const REMOTE_BANNER_TEXT =
+      "Remote hallway (ZeroTier): AutoVPN UI only. Overlay traffic is about 4 Mbit if you send it - not the house LAN, and not lab Gateway 192.168.50.10.";
+
+    function isAdvanced() {
+      return localStorage.getItem(ADV_KEY) === "1";
+    }
+
+    function applyMode() {
+      const adv = isAdvanced();
+      document.documentElement.classList.toggle("simple-mode", !adv);
+      document.documentElement.classList.toggle("advanced-mode", adv);
+      document.querySelectorAll("[data-mode-toggle]").forEach((btn) => {
+        btn.textContent = adv ? "Simple" : "Advanced";
+        btn.setAttribute("aria-pressed", adv ? "true" : "false");
+        btn.title = adv ? "Back to the simple view" : "Show the full lab dashboard";
+      });
+      syncProfileOptions();
+      updateNavUsers();
+    }
+
+    function offLanFromLocation() {
+      const h = (location.hostname || "").toLowerCase();
+      if (!h || h === "localhost" || h === "127.0.0.1") return false;
+      if (h === "autovpn.lab" || h.endsWith(".autovpn.lab")) return false;
+      if (h === "192.168.50.10" || h === "192.168.56.10") return false;
+      if (/^192\.168\.50\./.test(h) || /^192\.168\.56\./.test(h)) return false;
+      return true;
+    }
+
+    function isRemoteSession() {
+      return !!(session && session.remote) || document.documentElement.classList.contains("remote-view");
+    }
+
+    function applyRemoteUi(on, bannerText) {
+      document.documentElement.classList.toggle("remote-view", !!on);
+      const banner = document.getElementById("remote-limit-banner");
+      if (banner) {
+        banner.textContent = bannerText || REMOTE_BANNER_TEXT;
+        banner.hidden = !on;
+        banner.classList.toggle("show", !!on);
+      }
+      document.querySelectorAll("[data-remote-hint]").forEach((el) => {
+        el.classList.toggle("show", !!on);
+      });
+      if (on) {
+        ["gw-hint-simple", "gw-hint-simple-user"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = "Gateway is lab Wi‑Fi only.";
+        });
+      }
+    }
+
+    function setRemoteHint(apiOffLan) {
+      const on = apiOffLan === true || (apiOffLan == null && offLanFromLocation());
+      applyRemoteUi(on || isRemoteSession());
+    }
+
+    function syncProfileOptions() {
+      const sel = document.getElementById("profile-selector");
+      const custom = sel && sel.querySelector('option[value="custom"]');
+      if (!custom) return;
+      const keep = isAdvanced() || (sel && sel.value === "custom");
+      custom.hidden = !keep;
+      custom.disabled = !keep;
+    }
+
+    function updateNavUsers() {
+      const name = session && session.username ? session.username : "";
+      ["nav-user-devices", "nav-user-dash"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = name;
+      });
+      document.querySelectorAll(".acct-drop-name").forEach((el) => {
+        el.textContent = name ? ("Signed in as " + name) : "Account";
+      });
+    }
+
+    function setAdvanced(on) {
+      if (on) localStorage.setItem(ADV_KEY, "1");
+      else localStorage.removeItem(ADV_KEY);
+      applyMode();
+      if (!session) return;
+      if (isRemoteSession()) {
+        stopPoll();
+        if (on) {
+          showView("view-admin");
+          refreshAdmin();
+          pollTimer = setInterval(refreshAdmin, 4000);
+        } else {
+          showView("view-devices");
+          refreshUserDevices();
+          pollTimer = setInterval(refreshUserDevices, 4000);
+        }
+        return;
+      }
+      if (on) {
+        if (session.role === "admin" && !boundDevice) {
+          stopPoll();
+          showView("view-admin");
+          refreshAdmin();
+          pollTimer = setInterval(refreshAdmin, 4000);
+        } else if (boundDevice) {
+          updateStatus();
+        } else {
+          refreshUserDevices();
+        }
+      } else if (boundDevice) {
+        stopPoll();
+        showView("view-user");
+        updateStatus();
+        pollTimer = setInterval(updateStatus, 3000);
+      } else {
+        stopPoll();
+        showView("view-devices");
+        refreshUserDevices();
+        pollTimer = setInterval(refreshUserDevices, 4000);
+      }
+    }
+
+    function plainProfile(profile, autoInfo) {
+      const names = {
+        balanced: "Everyday",
+        gaming: "Gaming & calls",
+        streaming: "Video",
+        downloads: "Downloads",
+        custom: "Custom",
+        auto: "Auto",
+      };
+      const key = String(profile || "balanced").toLowerCase();
+      if (key === "auto" && autoInfo) {
+        const det = String(autoInfo.detected || "").toLowerCase();
+        if (det && names[det] && det !== "auto") return names[det];
+        const lab = String(autoInfo.label || "");
+        if (/everyday/i.test(lab)) return "Everyday";
+        if (/gaming/i.test(lab)) return "Gaming & calls";
+        if (/video|stream/i.test(lab)) return "Video";
+        if (/download/i.test(lab)) return "Downloads";
+      }
+      if (names[key]) return names[key];
+      const lab = String((autoInfo && autoInfo.label) || profile || "");
+      if (/everyday/i.test(lab)) return "Everyday";
+      if (/gaming/i.test(lab)) return "Gaming & calls";
+      if (/video|stream/i.test(lab)) return "Video";
+      if (/download/i.test(lab)) return "Downloads";
+      return "Everyday";
+    }
+
+    function simpleSentence(profile, vpn, autoInfo) {
+      const mode = plainProfile(profile, autoInfo);
+      const path = vpn && String(vpn).trim() && vpn !== "-" ? vpn : "picking a VPN";
+      return mode + " · " + path;
+    }
+
+    function simpleStatusText(opts) {
+      if (opts && opts.gatewayOff) return "Preview only - internet uses the router";
+      if (opts && opts.offline) return "Offline";
+      return "Online";
+    }
+
+    function setSimpleCopy(sentence, status) {
+      const now = document.getElementById("simple-now-text");
+      const nowSt = document.getElementById("simple-now-status");
+      const hero = document.getElementById("simple-hero-text");
+      const heroSt = document.getElementById("simple-hero-status");
+      if (now) now.textContent = sentence || "Checking the connection…";
+      if (nowSt) nowSt.textContent = status || "";
+      if (hero) hero.textContent = sentence || "Checking the connection…";
+      if (heroSt) heroSt.textContent = status || "";
+    }
+
+    function gatewayHint(enabled) {
+      return enabled
+        ? "This account is connected to the gateway."
+        : "Disconnected from the gateway. Other accounts stay connected.";
+    }
+
+    function setSimpleGwError(msg) {
+      ["simple-gw-error", "simple-gw-error-user"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = msg || "";
+      });
+    }
+
+    function nowStamp() {
+      const d = new Date();
+      return d.toTimeString().slice(0, 8);
+    }
+
+    function appendCalcCycle(list, meta = {}) {
+      const ranked = [...list].sort((a, b) => (b.score || 0) - (a.score || 0));
+      if (!ranked.length) return;
+      const winner = ranked.find(r => r.is_active) || ranked[0];
+      const saw = meta.saw || {};
+      const fp = ranked.map(r =>
+        `${r.id || r.name}:${(r.score || 0).toFixed(3)}:${r.source || (r.live ? "live" : "base")}:${r.failed ? 1 : 0}:${r.is_active ? 1 : 0}`
+      ).join("|") + `|${meta.profile || ""}|${saw.key || ""}|${(saw.parts || []).map(p => p.pct).join(",")}|${meta.switch_reason || ""}`;
+      if (fp === lastCalcFingerprint && calcLogLines.length) return;
+      lastCalcFingerprint = fp;
+
+      const shortName = (name) => ({
+        WireGuard: "WG", "IKEv2/IPsec": "IPsec", OpenVPN: "OVPN",
+        SoftEther: "SE", ZeroTier: "ZT", SSTP: "SSTP",
+        OpenConnect: "OC", Nebula: "Neb",
+      }[name] || name);
+      const METRIC = ["Lat", "Jit", "Loss", "Thr", "Reord", "MOS", "MTU"];
+
+      const who = meta.device ? String(meta.device) : "this device";
+      const modeLabel = saw.auto
+        ? `Auto → ${saw.label || meta.profile || "-"}`
+        : (saw.label || String(meta.profile || "-").replace(/^auto→/, "auto "));
+      const lines = [];
+      lines.push(
+        `<span class="cycle-head">${nowStamp()}  ${escapeLog(who)}  ${escapeLog(modeLabel)}  picked ${escapeLog(winner ? winner.name : "-")}</span>`
+      );
+      if (meta.evidence) {
+        lines.push(`<span class="muted">  doing   ${escapeLog(String(meta.evidence))}</span>`);
+      }
+      const parts = saw.ranked || saw.parts || [];
+      if (parts.length) {
+        const SHORT = {
+          Latency: "Lat", Jitter: "Jit", Loss: "Loss", Throughput: "Thr",
+          Reorder: "Reord", MOS: "MOS", MTU: "MTU",
+        };
+        const fmt = (arr) => arr.map((p) => `${SHORT[p.name] || p.name} ${p.pct}%`).join("  ");
+        for (let i = 0; i < parts.length; i += 3) {
+          const prefix = i === 0 ? "  weights " : "          ";
+          lines.push(`<span class="switch-why">${prefix}${escapeLog(fmt(parts.slice(i, i + 3)))}</span>`);
+        }
+      }
+      if (saw.prefers && saw.prefers.length) {
+        lines.push(`<span class="muted">  prefer  ${escapeLog(saw.prefers.join(", "))}</span>`);
+      }
+      lines.push(`<span class="muted">  math    score = sum(n x w) + affinity</span>`);
+      lines.push(`<span class="muted">          n = 10/Lat  5/Jit</span>`);
+      lines.push(`<span class="muted">            (100-Loss)/100  Thr/100</span>`);
+      lines.push(`<span class="muted">            (100-Reord)/100  MOS/5  MTU/1500</span>`);
+
+      ranked.forEach((c, idx) => {
+        const src = c.failed ? "fail" : (c.source || (c.live ? "live" : "base"));
+        const mark = c.is_active ? "*" : String(idx + 1);
+        const cls = c.failed ? "fail" : (c.is_active ? "winner" : "");
+        const contrib = Array.isArray(c.contrib) ? c.contrib : [];
+        let breakdown = "";
+        if (contrib.length === 7) {
+          const bits = contrib
+            .map((v, i) => ({ name: METRIC[i], v: Number(v) || 0 }))
+            .sort((a, b) => b.v - a.v)
+            .slice(0, 3)
+            .map((b) => `${b.v.toFixed(2)}${b.name}`);
+          const aff = Number(c.affinity || 0);
+          if (aff) bits.push(`aff${aff.toFixed(2)}`);
+          breakdown = " = " + bits.join("+");
+        }
+        const lat = (c.latency == null || c.failed) ? "-" : `${Math.round(Number(c.latency))}ms`;
+        const loss = (c.loss == null || c.failed) ? "-" : `${c.loss}%`;
+        const thr = (c.throughput == null || c.failed) ? "-" : String(Math.round(Number(c.throughput)));
+        lines.push(
+          `<span class="${cls}">  ${mark} ${escapeLog(shortName(c.name))} ${(c.score || 0).toFixed(2)}${escapeLog(breakdown)}  ${lat} ${loss} ${thr} ${src}</span>`
+        );
+      });
+      if (meta.switch_reason) {
+        let why = String(meta.switch_reason).replace(/^\d{2}:\d{2}:\d{2}\s/, "");
+        why = why.replace(/\s+because\s+/i, " because ");
+        if (why.length > 160) why = why.slice(0, 157) + "...";
+        lines.push(`<span class="switch-why">  ${escapeLog(why)}</span>`);
+      }
+
+      calcLogLines = [...lines, `<span class="muted">  .</span>`, ...calcLogLines].slice(0, 90);
+      const el = document.getElementById("calc-log");
+      if (el) {
+        el.innerHTML = calcLogLines.join("\n");
+        const pinNewest = () => { el.scrollTop = 0; };
+        pinNewest();
+        requestAnimationFrame(pinNewest);
+      }
+    }
+
+    function resetCalcLog(msg) {
+      calcLogLines = [];
+      lastCalcFingerprint = "";
+      lastActiveName = null;
+      const el = document.getElementById("calc-log");
+      if (el) el.textContent = msg || "Waiting for this view’s SAW cycles…";
+    }
+
+    function showViewBanner(text, kind) {
+      const el = document.getElementById("view-banner");
+      if (!el) return;
+      if (!text) {
+        el.hidden = true;
+        el.textContent = "";
+        el.className = "view-banner";
+        return;
+      }
+      el.hidden = false;
+      el.className = "view-banner " + (kind || "info");
+      el.textContent = text;
+    }
+
+    function qosSource(row) {
+      if (!row) return "baseline";
+      if (row.source === "live" || row.live) return "live";
+      return "baseline";
+    }
+
+    function friendlyApiError(e, fallback) {
+      const m = String((e && e.message) || "");
+      if (/failed to fetch|networkerror|load failed|network request failed/i.test(m)) {
+        if (isRemoteSession() || offLanFromLocation()) {
+          return "Limited remote UI. Overlay is about 4 Mbit and does not include the house LAN or lab Gateway.";
+        }
+        return "Cannot reach the gateway. Join the lab Wi‑Fi (192.168.50.x) and try again.";
+      }
+      if (/invalid credentials/i.test(m)) return "Wrong username or password.";
+      if (/login required/i.test(m)) return "Please log in again.";
+      if (/admin only/i.test(m)) return "That action is admin-only.";
+      if (/lab wi.?fi only/i.test(m)) return "Gateway is lab Wi‑Fi only.";
+      if (/device not yours/i.test(m)) return "That device is not on your account.";
+      if (/username already taken/i.test(m)) return "That username is taken.";
+      if (/username reserved/i.test(m)) return "That username is reserved.";
+      if (/cannot create admin/i.test(m)) return "You cannot create an admin account.";
+      if (/last admin/i.test(m)) return "The last admin account cannot be deleted.";
+      if (/title required/i.test(m)) return "Add a short title.";
+      if (/description required/i.test(m)) return "Add a short description.";
+      if (/traceback|exception at \/|file \"\//i.test(m)) return fallback || "Something went wrong.";
+      return m || fallback || "Something went wrong.";
+    }
+
+    function escapeLog(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+    function escapeAttr(s) {
+      return escapeLog(s).replace(/"/g, "&quot;");
+    }
+
+    function renderLiveLog(lines) {
+      const el = document.getElementById("live-log");
+      if (!el) return;
+      const ip = targetDeviceIp() || "";
+      const name = (boundDevice && boundDevice.name) || "";
+      let list = Array.isArray(lines) ? lines.slice() : [];
+      list = list.filter((raw) => {
+        const t = String(raw);
+        if (/\b(WATCHDOG|DHCP|FORWARDING|GATEWAY|ENGINE|STATE |API ERROR|BUG #|SAW )\b/.test(t)) return false;
+        if (ip && t.includes(ip)) return true;
+        if (name && t.includes(` ${name} `)) return true;
+        return /\b(SWITCH|STILL)\b/.test(t);
+      });
+      list.reverse();
+      if (!list.length) {
+        el.textContent = ip || name
+          ? "Waiting for this device's path changes."
+          : "Waiting for this device.";
+        return;
+      }
+      el.innerHTML = list.map((raw) => {
+        let s = String(raw).replace(/^\d{2}:\d{2}:\d{2}\s/, "");
+        s = s.replace(/\s+because\s+/i, " - ");
+        if (s.length > 140) s = s.slice(0, 137) + "...";
+        const t = escapeLog(s);
+        if (/\bSWITCH\b/.test(raw)) return `<span class="switch">${t}</span>`;
+        if (/\bSTILL\b/.test(raw)) return `<span class="still">${t}</span>`;
+        return t;
+      }).join("\n");
+      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+    }
+
+    function setLiveLogToggleLabel() {
+      const btn = document.getElementById("toggle-live-log");
+      if (btn) btn.textContent = showLiveLog ? "Hide live activity" : "Show live activity";
+    }
+
+    function setDetailsToggleLabel() {
+      const btn = document.getElementById("toggle-details");
+      if (btn) {
+        btn.textContent = showDetails ? "Hide calculations log" : "Show calculations log";
+      }
+    }
+
+    function setBackNavLabel() {
+      const btn = document.getElementById("back-to-devices");
+      if (!btn) return;
+      btn.textContent = (session && session.role === "admin" && !boundDevice)
+        ? "← Admin"
+        : "← Devices";
+    }
+
+    function isAdminSession() {
+      return !!(session && session.role === "admin");
+    }
+
+    function applyRoleClass() {
+      document.documentElement.classList.toggle("role-admin", isAdminSession());
+    }
+
+    function applySimulatedState(data) {
+      if (!data) return;
+      if (Array.isArray(data.simulated_down)) simulatedDown = data.simulated_down.slice();
+      if (Array.isArray(data.fail_paths)) failPaths = data.fail_paths.slice();
+      else if (Array.isArray(data.paths)) failPaths = data.paths.slice();
+      if (typeof data.wireguard_healthy === "boolean") {
+        setWgFailLabel(data.wireguard_healthy);
+      }
+      renderFailGrids();
+    }
+
+    function renderFailGrids() {
+      const fallback = [
+        { id: "my-wireguard", name: "WireGuard" },
+        { id: "my-ipsec", name: "IKEv2/IPsec" },
+        { id: "my-openvpn", name: "OpenVPN" },
+        { id: "my-softether", name: "SoftEther" },
+        { id: "my-zerotier", name: "ZeroTier" },
+        { id: "my-sstp", name: "SSTP" },
+        { id: "my-openconnect", name: "OpenConnect" },
+        { id: "my-nebula", name: "Nebula" },
+      ];
+      const paths = failPaths.length ? failPaths : fallback;
+      applyRoleClass();
+      ["fail-grid", "admin-fail-grid"].forEach((id) => {
+        const box = document.getElementById(id);
+        if (!box) return;
+        box.innerHTML = paths.map((p) => {
+          const down = !!p.simulated || !!p.failed || simulatedDown.includes(p.id);
+          return `<div class="fail-row">
+            <button type="button" class="fail-btn" data-fail-id="${escapeAttr(p.id)}" aria-pressed="${down ? "true" : "false"}">
+              <span>${escapeLog(p.name)}</span>
+              <span class="fail-state">${down ? "Restore" : "Fail"}</span>
+            </button>
+            <button type="button" class="fail-btn isolate-btn" data-isolate-id="${escapeAttr(p.id)}">Isolate</button>
+          </div>`;
+        }).join("");
+      });
+    }
+
+    async function togglePathFailure(id) {
+      if (!id) return;
+      try {
+        const body = { id };
+        const dip = targetDeviceIp();
+        if (dip) body.device_ip = dip;
+        const res = await api("/api/toggle-failure", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        applySimulatedState(res);
+        if (document.getElementById("view-admin").classList.contains("active")) refreshAdmin();
+        else updateStatus();
+      } catch (e) {
+        alert(friendlyApiError(e, "Could not toggle that VPN path."));
+      }
+    }
+
+    async function restoreAllPaths() {
+      try {
+        const body = {};
+        const dip = targetDeviceIp();
+        if (dip) body.device_ip = dip;
+        const res = await api("/api/restore-paths", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        applySimulatedState(res);
+        if (document.getElementById("view-admin").classList.contains("active")) refreshAdmin();
+        else updateStatus();
+      } catch (e) {
+        alert(friendlyApiError(e, "Could not restore the VPN paths."));
+      }
+    }
+
+    async function isolatePath(id) {
+      if (!id) return;
+      try {
+        const body = { id };
+        const dip = targetDeviceIp();
+        if (dip) body.device_ip = dip;
+        const res = await api("/api/isolate-path", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        applySimulatedState(res);
+        if (document.getElementById("view-admin").classList.contains("active")) refreshAdmin();
+        else updateStatus();
+      } catch (e) {
+        alert(friendlyApiError(e, "Could not isolate that VPN."));
+      }
+    }
+
+    function setWgFailLabel(healthy) {
+      const btn = document.getElementById("admin-fail");
+      if (!btn) return;
+      if (healthy === false) {
+        btn.textContent = "WG simulated DOWN - restore";
+      } else {
+        btn.textContent = "Simulate WG down";
+      }
+    }
+
+    function updateDeviceChip(dev, opts) {
+      const el = document.getElementById("device-chip");
+      if (!el) return;
+      if (!dev) {
+        el.textContent = "Select a device to control…";
+        return;
+      }
+      const controlling = !!(opts && opts.controlling);
+      const label = controlling ? "Controlling" : "This device";
+      const offline = dev.online === false ? " · offline" : "";
+      const egress = deviceEgressLabel(dev);
+      el.innerHTML = `${label}: <strong>${dev.name || "Device"}</strong> · ${dev.ip || "-"}`
+        + ` · ${dev.effective_label || dev.profile || "…"} → <strong>${dev.active_name || "…"}</strong>`
+        + ` · ${egress}${offline}`;
+    }
+
+    function targetDeviceIp() {
+      if (boundDevice && boundDevice.ip) return boundDevice.ip;
+      return myDeviceIp || undefined;
+    }
+
+    function statusUrl() {
+      const ip = targetDeviceIp();
+      return ip ? `/api/status?device_ip=${encodeURIComponent(ip)}` : "/api/status";
+    }
+
+    function renderAdminDevices(list) {
+      const box = document.getElementById("admin-device-list");
+      if (!box) return;
+      if (!list || !list.length) {
+        box.innerHTML = "<div style='color:#888;font-size:13px'>No lab or ZeroTier clients yet.</div>";
+        return;
+      }
+      box.innerHTML = list.map(d => {
+        const st = deviceStatusEmojis(d);
+        const remote = deviceIsRemote(d);
+        const pick = d.active_name ? ` → ${d.active_name}` : "";
+        return `
+        <div class="device-row ${d.online ? "" : "offline"}" data-ip="${d.ip}">
+          <div>
+            <div class="name">${st.online} ${d.name || "Device"} ${d.online ? "" : "(offline)"}${remote ? " · ZT" : ""}</div>
+            <div class="meta">${d.ip}${d.mac ? " · " + d.mac : ""}${d.table ? " · t" + d.table : ""} · ${st.label}${st.evidence ? " · " + st.evidence : ""}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:20px;letter-spacing:2px" title="${st.label}">${st.profile} ${st.vpn}</div>
+            <div class="meta">${d.effective_label || d.profile}${pick}</div>
+          </div>
+        </div>`;
+      }).join("");
+      box.querySelectorAll(".device-row").forEach(row => {
+        row.onclick = () => openAdminDevice(row.getAttribute("data-ip"));
+      });
+    }
+
+    async function openAdminDevice(ip) {
+      selectedAdminDevice = ip;
+      try {
+        const d = await api(`/api/devices/${encodeURIComponent(ip)}`);
+        const panel = document.getElementById("admin-device-detail");
+        panel.style.display = "block";
+        document.getElementById("dev-detail-title").textContent = `${d.name || "Device"} · ${d.ip}`;
+        document.getElementById("dev-detail-body").innerHTML = `
+          <div><strong>Status:</strong> ${d.online ? "🟢 Online" : "🔴 Offline"}</div>
+          <div><strong>Kind:</strong> ${d.kind === "remote" ? "ZeroTier remote" : "Lab LAN"}</div>
+          <div><strong>MAC:</strong> ${d.mac || "-"}</div>
+          <div><strong>Table / mark:</strong> ${d.table ?? "-"} / ${d.mark ?? "-"}</div>
+          <div><strong>Profile:</strong> ${d.profile} → ${d.effective_label || d.effective_profile}</div>
+          <div><strong>VPN path:</strong> ${d.active_name || "-"}</div>
+          <div><strong>Egress:</strong> ${deviceEgressLabel(d)}${d.egress_reason ? " · " + d.egress_reason : ""}</div>
+          <div><strong>Evidence:</strong> ${(d.auto && d.auto.evidence) || d.evidence || "-"}</div>`;
+        const force = document.getElementById("dev-force-regime");
+        force.innerHTML = (d.metrics || []).map(m =>
+          `<option value="${m.id}" ${m.is_active ? "selected" : ""}>${m.name}</option>`).join("");
+        document.getElementById("dev-detail-metrics").innerHTML =
+          (d.metrics || []).map(m => {
+            const src = (m.source === "live" || m.live) ? "live" : "baseline";
+            return `<div class="pick-row ${m.is_active ? "selected" : ""}">
+              <span>${m.name} · <span class="badge ${src === "live" ? "badge-live" : "badge-baseline"}">${src}</span></span>
+              <span class="score-tag">SAW ${(m.score||0).toFixed(3)} · lat ${m.latency ?? "-"} · aff ${m.affinity ?? 0}</span>
+            </div>`;
+          }).join("") || "<div class='empty-state warn'>No scores for this device yet.</div>";
+      } catch (e) {
+        alert("Could not load device: " + e.message);
+      }
+    }
+
+    document.getElementById("dev-detail-close").onclick = () => {
+      selectedAdminDevice = null;
+      document.getElementById("admin-device-detail").style.display = "none";
+    };
+    document.getElementById("dev-force-btn").onclick = async () => {
+      if (!selectedAdminDevice) return;
+      const regime = document.getElementById("dev-force-regime").value;
+      try {
+        await api(`/api/devices/${encodeURIComponent(selectedAdminDevice)}/force`, {
+          method: "POST",
+          body: JSON.stringify({ regime }),
+        });
+        openAdminDevice(selectedAdminDevice);
+        refreshAdmin();
+      } catch (e) { alert(friendlyApiError(e, "Force failed")); }
+    };
+
+    function setLoading(on, text) {
+      const el = document.getElementById("loading-overlay");
+      const label = document.getElementById("loading-text");
+      if (label && text) label.textContent = text;
+      if (el) el.classList.toggle("show", !!on);
+      const sel = document.getElementById("profile-selector");
+      if (sel) sel.disabled = !!on;
+    }
+
+    function setGatewayUi(enabled) {
+      gatewayEnabled = !!enabled;
+      const toggles = [
+        document.getElementById("gateway-toggle"),
+        document.getElementById("gateway-toggle-admin"),
+        document.getElementById("gateway-toggle-simple"),
+        document.getElementById("gateway-toggle-simple-user"),
+      ];
+      const labels = [
+        document.getElementById("gw-label"),
+        document.getElementById("gw-label-admin"),
+        document.getElementById("gw-label-simple"),
+        document.getElementById("gw-label-simple-user"),
+      ];
+      const main = document.getElementById("user-main");
+      const route = document.getElementById("route-status");
+      syncingGatewayToggle = true;
+      toggles.forEach(t => {
+        if (!t) return;
+        t.checked = gatewayEnabled;
+        t.setAttribute("aria-checked", gatewayEnabled ? "true" : "false");
+      });
+      syncingGatewayToggle = false;
+      labels.forEach(label => {
+        if (!label) return;
+        label.textContent = gatewayEnabled ? "Connected" : "Disconnected";
+        label.className = gatewayEnabled ? "on" : "off";
+      });
+      const hint = gatewayHint(gatewayEnabled);
+      ["gw-hint-simple", "gw-hint-simple-user"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = hint;
+      });
+      if (main) main.classList.remove("dimmed");
+      if (route) route.classList.toggle("paused", !gatewayEnabled);
+      const sel = document.getElementById("profile-selector");
+      if (sel) sel.disabled = false;
+    }
+
+    function closeAcctMenus() {
+      document.querySelectorAll(".acct-wrap").forEach((wrap) => {
+        const drop = wrap.querySelector(".acct-drop");
+        const btn = wrap.querySelector(".acct-toggle");
+        if (drop) drop.hidden = true;
+        if (btn) btn.setAttribute("aria-expanded", "false");
+      });
+    }
+
+    function hasAccountConsent(sess) {
+      return !!(sess && sess.data_consent);
+    }
+
+    function syncConsentEnter() {
+      const box = document.getElementById("consent-check");
+      const btn = document.getElementById("consent-enter");
+      if (btn) btn.disabled = !(box && box.checked);
+    }
+
+    function openConsentGate(nextFn) {
+      afterConsent = nextFn;
+      const box = document.getElementById("consent-check");
+      const err = document.getElementById("consent-error");
+      if (box) box.checked = false;
+      if (err) err.textContent = "";
+      syncConsentEnter();
+      const logoutBtn = document.getElementById("consent-logout");
+      if (logoutBtn) logoutBtn.hidden = isRemoteSession();
+      openModal("consent-modal");
+    }
+
+    async function requireConsentThen(nextFn) {
+      if (hasAccountConsent(session)) {
+        nextFn();
+        return;
+      }
+      if (session && session.token && !isRemoteSession()) {
+        try {
+          const me = await api("/api/me");
+          session.data_consent = !!me.data_consent;
+          if (me.user_id) session.user_id = me.user_id;
+          localStorage.setItem("autovpn_session", JSON.stringify(session));
+          if (session.data_consent) {
+            nextFn();
+            return;
+          }
+        } catch (_) { /* show the gate */ }
+      }
+      openConsentGate(nextFn);
+    }
+
+    function showView(id) {
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+      document.documentElement.classList.toggle("admin-view", id === "view-admin");
+      applyRoleClass();
+      const logged = !!session && ["view-devices", "view-user", "view-admin"].includes(id);
+      const fab = document.getElementById("bug-fab");
+      if (fab) fab.hidden = !logged;
+      if (!logged) closeAcctMenus();
+    }
+
+    function setTagline(count) {
+      if (!isAdvanced()) {
+        ["tagline", "tagline-user"].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = "Pick a mode. We pick the best VPN.";
+        });
+        return;
+      }
+      const t = count
+        ? `${count} protocol paths · one internet · SAW picks the fit`
+        : "Pick a mode. We pick the best protocol path.";
+      ["tagline", "tagline-user"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t;
+      });
+    }
+
+    async function api(path, opts = {}) {
+      const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+      if (session && session.token) headers["Authorization"] = `Bearer ${session.token}`;
+      let res;
+      try {
+        res = await fetch(`${BACKEND_URL}${path}`, { ...opts, headers });
+      } catch (net) {
+        const err = new Error(friendlyApiError(net, "Cannot reach the gateway."));
+        err.status = 0;
+        throw err;
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        let body = {};
+        let msg = text || `HTTP ${res.status}`;
+        try { body = JSON.parse(text); msg = body.error || msg; } catch (_) {}
+        if (res.status === 401 && session && !/\/api\/(login|signup|session)/.test(path)) {
+          if (isRemoteSession()) {
+            const errRemote = new Error(friendlyApiError({ message: msg }, msg));
+            errRemote.status = res.status;
+            errRemote.body = body;
+            throw errRemote;
+          }
+          session = null;
+          boundDevice = null;
+          myDeviceIp = null;
+          localStorage.removeItem("autovpn_session");
+          stopPoll();
+          showView("view-login");
+          const loginErr = document.getElementById("login-error");
+          if (loginErr) loginErr.textContent = "Session expired. Please log in again.";
+        }
+        const err = new Error(friendlyApiError({ message: msg }, msg));
+        err.status = res.status;
+        err.body = body;
+        throw err;
+      }
+      if (res.status === 204) return {};
+      return res.json();
+    }
+
+    function qualityFromRow(row) {
+      if (!row) return { label: "Unknown", cls: "badge-fair" };
+      const mos = Number(row.mos) || 0;
+      const loss = Number(row.loss) || 0;
+      const lat = Number(row.latency) || 999;
+      if (loss >= 50 || mos <= 2) return { label: "Poor", cls: "badge-poor" };
+      if (mos >= 4.2 && lat < 80 && loss < 1) return { label: "Excellent", cls: "badge-excellent" };
+      if (mos >= 3.6 && loss < 5) return { label: "Good", cls: "badge-good" };
+      return { label: "Fair", cls: "badge-fair" };
+    }
+
+    function fitBars(score, maxScore) {
+      const ratio = maxScore > 0 ? score / maxScore : 0;
+      const filled = Math.max(1, Math.min(5, Math.round(ratio * 5)));
+      let html = '<div class="fit-bars">';
+      for (let i = 1; i <= 5; i++) html += `<i class="${i <= filled ? "on" : ""}"></i>`;
+      html += "</div>";
+      const words = ["Weak", "Okay", "Good", "Strong", "Best"];
+      html += `<div class="fit-label">${words[filled - 1]} fit</div>`;
+      return html;
+    }
+
+    function statusLine(row) {
+      return qosSource(row) === "live" ? "Live QoS" : "Baseline (characteristic)";
+    }
+
+    function setProfileMeta(info, profileKey, autoInfo) {
+      const key = profileKey || (info && info._key) || "balanced";
+      const friendly = FRIENDLY_PROFILE[key] || info || FRIENDLY_PROFILE.balanced;
+      const blurbEl = document.getElementById("profile-blurb");
+      const prefersEl = document.getElementById("profile-prefers");
+      const autoEl = document.getElementById("auto-status");
+
+      if (key === "auto" && autoInfo) {
+        blurbEl.textContent = "Auto is watching your traffic and picking a mode.";
+        const sub = FRIENDLY_PROFILE[autoInfo.detected] || FRIENDLY_PROFILE.balanced;
+        prefersEl.textContent = sub.prefers && sub.prefers.length
+          ? ("Usually picks: " + sub.prefers.join(", "))
+          : "Adapting…";
+        autoEl.style.display = "block";
+        autoEl.innerHTML = `Right now: <strong>${autoInfo.label || autoInfo.detected}</strong>`
+          + (autoInfo.evidence ? `<div style="margin-top:4px;color:#9ab;font-size:12px">${autoInfo.evidence}</div>` : "");
+      } else {
+        blurbEl.textContent = (info && info.blurb) || friendly.blurb;
+        const list = (info && info.prefers) || friendly.prefers || [];
+        prefersEl.textContent = list.length
+          ? ("Usually picks: " + list.join(", "))
+          : "Uses the priorities you set below.";
+        autoEl.style.display = "none";
+      }
+    }
+
+    function renderMetrics(list, opts = {}) {
+      setTagline(list.length || 8);
+      const ranked = [...list].sort((a, b) => (b.score || 0) - (a.score || 0));
+      const maxScore = ranked[0] ? ranked[0].score : 1;
+      const qosLabel = opts.qos_label || "";
+      const qosMode = opts.qos_mode || "";
+      const qosEl = document.getElementById("qos-line");
+      if (qosEl) {
+        qosEl.textContent = qosLabel
+          || "Each path is marked live QoS or characteristic baseline.";
+      }
+
+      let html = "";
+      if (!ranked.length) {
+        html = `<div class="empty-state warn">${opts.empty ||
+          "No scores for this view yet. Wait one SAW cycle - this is not the host ranking."}</div>`;
+      }
+      ranked.forEach((c, idx) => {
+        const q = qualityFromRow(c);
+        const src = qosSource(c);
+        const rank = c.is_active ? "In use" : (idx === 0 ? "Top pick" : `#${idx + 1}`);
+        html += `<div class="pick-row ${c.is_active ? "selected" : ""} ${c.failed || simulatedDown.includes(c.id) ? "failed" : ""}">
+          <div>
+            <div class="pick-name">${c.name}${c.failed || simulatedDown.includes(c.id) ? " · failed" : ""}</div>
+            <div class="pick-sub">${rank} · ${c.failed || simulatedDown.includes(c.id) ? "sim down" : statusLine(c)} · ${q.label}
+              · ${c.latency ?? "-"}ms · ${(c.score || 0).toFixed(2)}</div>
+          </div>
+          <div class="pick-right">
+            <span class="badge ${src === "live" ? "badge-live" : "badge-baseline"}">${src}</span>
+            ${fitBars(c.score || 0, maxScore)}
+          </div>
+        </div>`;
+      });
+      document.getElementById("containers").innerHTML = html;
+
+      const tick = document.getElementById("match-tick");
+      if (tick) {
+        const ev = opts.evidence || "waiting";
+        const prof = opts.profile || "-";
+        const who = opts.device ? `device ${opts.device}` : "host";
+        tick.textContent = `${nowStamp()} · ${who} · ${prof} · ${qosMode || "-"} · ${ev}`;
+      }
+
+      if (ranked.length) {
+        appendCalcCycle(ranked, {
+          profile: opts.profile,
+          evidence: opts.evidence,
+          device: opts.device,
+          qos_label: qosLabel,
+          switch_reason: opts.switch_reason || "",
+          saw: opts.saw || {},
+        });
+      }
+      const details = document.getElementById("details-panel");
+      details.classList.toggle("open", showDetails);
+      setDetailsToggleLabel();
+
+      const named = String(opts.active_name || "").trim();
+      const active = list.find(r => r.is_active)
+        || ranked[0]
+        || (named ? { name: named, is_active: true } : null);
+      const heroVpn = document.getElementById("hero-vpn");
+      const heroQ = document.getElementById("hero-quality");
+      const heroK = document.getElementById("hero-kicker");
+      const heroQos = document.getElementById("hero-qos");
+      const routeDiv = document.getElementById("route-status");
+      if (heroQos) heroQos.textContent = qosLabel || "Live vs baseline pending…";
+
+      if (opts.offline) {
+        if (heroK) heroK.textContent = "Device offline";
+        heroVpn.textContent = (active && active.name) || "-";
+        heroQ.innerHTML = `<span class="badge badge-poor">Offline</span><span style="color:#888">Last pick / this device’s profile - not the host</span>`;
+        routeDiv.classList.add("paused");
+        return;
+      }
+
+      if (!gatewayEnabled) {
+        const pick = active && active.name ? active.name : "MikroTik";
+        if (heroK) heroK.textContent = "Recommended (score only)";
+        heroVpn.textContent = pick;
+        const src = qosSource(active);
+        heroQ.innerHTML = `<span class="badge badge-fair">Disconnected</span>`
+          + `<span class="badge ${src === "live" ? "badge-live" : "badge-baseline"}">${src}</span>`
+          + `<span style="color:#888">Traffic exits MikroTik · SAW still ranking 8 protocol paths</span>`;
+        routeDiv.classList.add("paused");
+        return;
+      }
+      routeDiv.classList.remove("paused");
+
+      if (active && active.is_active) {
+        const q = qualityFromRow(active);
+        const src = qosSource(active);
+        const changed = lastActiveName && lastActiveName !== active.name;
+        const via = (opts.egress === "tunnel" && opts.egress_dev)
+          ? `exit ${opts.egress_dev}`
+          : "exit MikroTik";
+        if (heroK) {
+          heroK.textContent = (opts.controlling ? "This device’s pick" : "Connected with")
+            + (gatewayEnabled ? ` · ${via}` : "");
+        }
+        heroVpn.textContent = active.name;
+        let badges = `<span class="badge ${q.cls}">${q.label} quality</span>`;
+        badges += ` <span class="badge ${src === "live" ? "badge-live" : "badge-baseline"}">${src === "live" ? "Live QoS" : "Baseline"}</span>`;
+        if (opts.switched || changed) {
+          badges += ` <span class="badge badge-switched">Just switched</span>`;
+          routeDiv.classList.remove("flash");
+          void routeDiv.offsetWidth;
+          routeDiv.classList.add("flash");
+        }
+        heroQ.innerHTML = badges;
+        lastActiveName = active.name;
+      } else if (active) {
+        if (heroK) heroK.textContent = "Best match";
+        heroVpn.textContent = active.name;
+        const src = qosSource(active);
+        heroQ.innerHTML = `<span class="badge badge-fair">Ready</span>`
+          + ` <span class="badge ${src === "live" ? "badge-live" : "badge-baseline"}">${src}</span>`;
+      } else {
+        if (heroK) heroK.textContent = "Connected with";
+        heroVpn.textContent = named || "picking a VPN";
+        heroQ.innerHTML = `<span class="badge badge-fair">Waiting for scores</span>`;
+      }
+    }
+
+    /* ---- Custom 100-point budget ---- */
+    function readWeights() {
+      return WEIGHT_IDS.map(id => parseInt(document.getElementById(id).value, 10) || 0);
+    }
+
+    function updateBudgetUI() {
+      const vals = readWeights();
+      const used = vals.reduce((a, b) => a + b, 0);
+      const fill = document.getElementById("budget-fill");
+      const bar = document.getElementById("budget-bar");
+      const text = document.getElementById("budget-text");
+      fill.style.width = Math.min(100, used) + "%";
+      bar.classList.toggle("over", used > BUDGET_TOTAL);
+      const left = BUDGET_TOTAL - used;
+      text.innerHTML = left >= 0
+        ? `<strong>${used}</strong> / ${BUDGET_TOTAL} points used · <strong>${left}</strong> left`
+        : `<strong>${used}</strong> / ${BUDGET_TOTAL} - over budget by ${-left}`;
+      vals.forEach((v, i) => {
+        document.getElementById(PCT_IDS[i]).textContent = v + "%";
+      });
+    }
+
+    function clampSlider(changedId) {
+      if (adjustingSlider) return;
+      adjustingSlider = true;
+      const vals = readWeights();
+      const idx = WEIGHT_IDS.indexOf(changedId);
+      const others = vals.reduce((a, b, i) => a + (i === idx ? 0 : b), 0);
+      const maxAllowed = Math.max(0, BUDGET_TOTAL - others);
+      let v = parseInt(document.getElementById(changedId).value, 10) || 0;
+      if (v > maxAllowed) {
+        v = maxAllowed;
+        document.getElementById(changedId).value = String(v);
+      }
+      // Keep each slider's HTML max at remaining+current so UI can't overshoot easily
+      WEIGHT_IDS.forEach((id, i) => {
+        const el = document.getElementById(id);
+        const rest = vals.reduce((a, b, j) => a + (j === i ? 0 : (j === idx ? v : b)), 0);
+        el.max = String(Math.max(0, BUDGET_TOTAL - rest + (i === idx ? 0 : 0)));
+        // simpler: max = remaining for others + this value
+        const othersNow = WEIGHT_IDS.reduce((a, oid, j) => {
+          if (j === i) return a;
+          return a + (parseInt(document.getElementById(oid).value, 10) || 0);
+        }, 0);
+        el.max = String(Math.max(parseInt(el.value, 10) || 0, BUDGET_TOTAL - othersNow));
+      });
+      adjustingSlider = false;
+      updateBudgetUI();
+    }
+
+    WEIGHT_IDS.forEach(id => {
+      document.getElementById(id).addEventListener("input", () => clampSlider(id));
+    });
+    updateBudgetUI();
+
+    document.getElementById("toggle-live-log").onclick = () => {
+      showLiveLog = !showLiveLog;
+      document.getElementById("live-log").classList.toggle("open", showLiveLog);
+      setLiveLogToggleLabel();
+    };
+
+    document.getElementById("toggle-details").onclick = () => {
+      showDetails = !showDetails;
+      document.getElementById("details-panel").classList.toggle("open", showDetails);
+      setDetailsToggleLabel();
+    };
+
+    async function finishAuth(data) {
+      session = data;
+      localStorage.setItem("autovpn_session", JSON.stringify(data));
+      applyRoleClass();
+      if (data && (data.remote || data.skip_login)) {
+        enterRemoteAdmin(data);
+        return;
+      }
+      if (!localStorage.getItem("autovpn_onboarded")) {
+        onboardIndex = 0;
+        renderOnboard();
+        showView("view-onboard");
+      } else {
+        enterApp(data);
+      }
+    }
+
+    document.getElementById("login-btn").onclick = async () => {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      const err = document.getElementById("login-error");
+      const btn = document.getElementById("login-btn");
+      err.textContent = "";
+      if (!username || !password) {
+        err.textContent = "Enter a username and password.";
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const data = await api("/api/login", {
+          method: "POST",
+          body: JSON.stringify({ username, password })
+        });
+        await finishAuth(data);
+      } catch (e) {
+        err.textContent = friendlyApiError(e, "Invalid credentials.");
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    function passwordIsStrong(password) {
+      return password.length >= 8
+        && /[a-z]/.test(password)
+        && /[A-Z]/.test(password)
+        && /[0-9]/.test(password)
+        && /[^A-Za-z0-9]/.test(password);
+    }
+
+    document.querySelectorAll("[data-pw-toggle]").forEach((btn) => {
+      btn.onclick = () => {
+        const input = document.getElementById(btn.getAttribute("data-pw-toggle"));
+        if (!input) return;
+        const hidden = input.type === "password";
+        input.type = hidden ? "text" : "password";
+        btn.textContent = hidden ? "Hide" : "Show";
+      };
+    });
+
+    document.getElementById("signup-link").onclick = () => {
+      document.getElementById("login-error").textContent = "";
+      document.getElementById("signup-error").textContent = "";
+      showView("view-signup");
+    };
+    document.getElementById("back-to-login").onclick = () => showView("view-login");
+
+    document.getElementById("signup-btn").onclick = async () => {
+      const username = document.getElementById("signup-username").value.trim();
+      const password = document.getElementById("signup-password").value;
+      const password2 = document.getElementById("signup-password2").value;
+      const err = document.getElementById("signup-error");
+      const btn = document.getElementById("signup-btn");
+      err.textContent = "";
+      if (username.length < 3) {
+        err.textContent = "Username must be at least 3 characters.";
+        return;
+      }
+      if (!passwordIsStrong(password)) {
+        err.textContent = "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.";
+        return;
+      }
+      if (password !== password2) {
+        err.textContent = "Passwords do not match.";
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const data = await api("/api/signup", {
+          method: "POST",
+          body: JSON.stringify({ username, password }),
+        });
+        await finishAuth(data);
+      } catch (e) {
+        err.textContent = friendlyApiError(e, "Signup failed.");
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    function renderOnboard() {
+      document.getElementById("onboard-text").textContent = ONBOARD_SLIDES[onboardIndex];
+      document.querySelectorAll("#onboard-dots i").forEach((d, i) => d.classList.toggle("on", i === onboardIndex));
+      document.getElementById("onboard-next").textContent =
+        onboardIndex === ONBOARD_SLIDES.length - 1 ? "Enter →" : "Next →";
+    }
+
+    document.getElementById("onboard-next").onclick = () => {
+      if (onboardIndex < ONBOARD_SLIDES.length - 1) {
+        onboardIndex += 1;
+        renderOnboard();
+      } else {
+        localStorage.setItem("autovpn_onboarded", "1");
+        requireConsentThen(() => enterApp(session));
+      }
+    };
+
+    function deviceIsRemote(d) {
+      if (!d) return false;
+      if (d.kind === "remote") return true;
+      const ip = d.ip || "";
+      if (/^10\.71\.80\./.test(ip) && ip !== "10.71.80.237") return true;
+      return /^10\.61\.136\./.test(ip) && ip !== "10.61.136.10";
+    }
+
+    function deviceEgressLabel(d) {
+      if (!d) return "via MikroTik";
+      if (d.egress === "tunnel" && (d.egress_dev || d.egress_via)) {
+        return `via ${d.egress_dev || d.egress_via}`;
+      }
+      return "via MikroTik";
+    }
+
+    function deviceEvidence(d) {
+      return (d && (d.evidence || (d.auto && d.auto.evidence))) || "";
+    }
+
+    function deviceStatusEmojis(d) {
+      const online = d.online ? "🟢" : "🔴";
+      const profKey = (d.effective_profile || d.profile || "").toLowerCase();
+      const profMap = {
+        auto: "🤖",
+        gaming: "🎮",
+        streaming: "📺",
+        browsing: "🌐",
+        balanced: "⚖️",
+        custom: "🎛️",
+        secure: "🔒",
+      };
+      const profile = profMap[profKey] || "📶";
+      const path = (d.active_name || "").toLowerCase();
+      let vpn = "❔";
+      if (!d.online) vpn = "💤";
+      else if (path.includes("wireguard")) vpn = "🛡️";
+      else if (path.includes("ike") || path.includes("ipsec")) vpn = "🔑";
+      else if (path.includes("openvpn")) vpn = "🔐";
+      else if (path.includes("softether")) vpn = "🧩";
+      else if (path.includes("nebula")) vpn = "🌌";
+      else if (path.includes("sstp")) vpn = "🧱";
+      else if (path.includes("openconnect") || path.includes("anyconnect")) vpn = "🛰️";
+      else if (d.active_name) vpn = "🚀";
+      const ev = deviceEvidence(d);
+      const label = d.online
+        ? `${d.effective_label || d.profile || "-"} · ${d.active_name || "-"} · ${deviceEgressLabel(d)}`
+        : "offline";
+      return { online, profile, vpn, label, evidence: ev };
+    }
+
+    function deviceDeleteBtn(d) {
+      if (!d || !d.id) return "";
+      return `<button type="button" class="btn btn-danger btn-sm device-del" data-id="${d.id}" data-name="${escapeAttr(d.name || "Device")}">Delete</button>`;
+    }
+
+    async function removeBoundDevice(deviceId, name, opts) {
+      const ok = await askConfirm(
+        "Remove this device?",
+        (name || "This device") + " will leave this account. Real VPN tunnels stay up.",
+        "Delete"
+      );
+      if (!ok) return;
+      const adminAccountId = opts && opts.adminAccountId;
+      try {
+        if (adminAccountId) {
+          await api(`/api/admin/accounts/${adminAccountId}/devices/${deviceId}`, { method: "DELETE" });
+          await openAdminAccount(adminAccountId);
+          return;
+        }
+        await api(`/api/me/devices/${deviceId}`, { method: "DELETE" });
+        if (boundDevice && Number(boundDevice.id) === Number(deviceId)) {
+          boundDevice = null;
+          myDeviceIp = null;
+          stopPoll();
+          showView("view-devices");
+        }
+        await refreshUserDevices();
+      } catch (e) {
+        alert(friendlyApiError(e, "Could not remove device."));
+      }
+    }
+
+    function wireDeviceDeleteButtons(root, opts) {
+      if (!root) return;
+      root.querySelectorAll(".device-del").forEach((btn) => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          removeBoundDevice(
+            Number(btn.getAttribute("data-id")),
+            btn.getAttribute("data-name") || "This device",
+            opts || {}
+          );
+        };
+      });
+    }
+
+    async function refreshUserDevices() {
+      const box = document.getElementById("user-device-list");
+      const err = document.getElementById("device-list-error");
+      err.textContent = "";
+      document.getElementById("devices-user-label").textContent =
+        session ? `Signed in as ${session.username}` : "Signed in";
+      updateNavUsers();
+      try {
+        const [data, status] = await Promise.all([
+          api("/api/me/devices"),
+          api("/api/status").catch(() => ({})),
+        ]);
+        if (typeof status.gateway_enabled === "boolean") setGatewayUi(status.gateway_enabled);
+        if (status.remote && typeof status.remote.off_lan === "boolean") {
+          setRemoteHint(status.remote.off_lan);
+        }
+        const list = data.devices || [];
+        const focus = list.find(d => d.online) || list[0];
+        if (focus) {
+          setSimpleCopy(
+            simpleSentence(
+              focus.effective_profile || focus.profile,
+              focus.active_name,
+              focus.auto
+            ),
+            simpleStatusText({ gatewayOff: !gatewayEnabled, offline: focus.online === false })
+          );
+        } else {
+          const active = (status.metrics || []).find(m => m.is_active) || (status.metrics || [])[0];
+          setSimpleCopy(
+            simpleSentence(status.profile, (active && active.name) || status.active_path, status.auto),
+            simpleStatusText({ gatewayOff: !gatewayEnabled })
+          );
+        }
+        if (!list.length) {
+          box.innerHTML = isAdvanced()
+            ? `<div class="empty-state">
+            No devices yet. Connect this phone or PC to the lab Wi‑Fi (192.168.50.x)
+            or ZeroTier overlay (<code>10.71.80.x</code>, join <code>cf719fd540b50c25</code>), then tap <strong>+ Add this device</strong>.
+          </div>`
+            : `<div class="empty-state">No devices yet. Connect to the lab Wi‑Fi or ZeroTier, then tap <strong>+ Add this device</strong>.</div>`;
+          return;
+        }
+        box.innerHTML = list.map(d => {
+          const st = deviceStatusEmojis(d);
+          if (!isAdvanced()) {
+            let line = "Offline";
+            if (d.online) {
+              line = gatewayEnabled
+                ? (`Online · ${d.active_name || "picking a VPN"}`)
+                : "Online";
+            }
+            return `
+          <div class="device-row ${d.online ? "" : "offline"}" data-id="${d.id}" data-ip="${d.ip || ""}" data-mac="${d.mac || ""}" data-name="${(d.name || "Device").replace(/"/g, "&quot;")}">
+            <div>
+              <div class="name">${d.name || (deviceIsRemote(d) ? "Remote" : "Device")}</div>
+              <div class="meta">${line}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              ${deviceDeleteBtn(d)}
+              <div class="meta">Open →</div>
+            </div>
+          </div>`;
+          }
+          return `
+          <div class="device-row ${d.online ? "" : "offline"}" data-id="${d.id}" data-ip="${d.ip || ""}" data-mac="${d.mac || ""}" data-name="${(d.name || "Device").replace(/"/g, "&quot;")}">
+            <div>
+              <div class="name">${d.name || "Device"}</div>
+              <div class="meta">${d.ip || "no IP"} ${d.mac ? "· " + d.mac : ""} · ${st.label}${st.evidence ? " · " + st.evidence : ""}</div>
+            </div>
+            <div style="text-align:right;line-height:1.35">
+              <div style="font-size:22px;letter-spacing:2px" title="${st.label}">${st.online} ${st.profile} ${st.vpn}</div>
+              <div style="margin-top:6px;display:flex;justify-content:flex-end;align-items:center;gap:10px">
+                ${deviceDeleteBtn(d)}
+                <div class="meta">Open →</div>
+              </div>
+            </div>
+          </div>`;
+        }).join("");
+        box.querySelectorAll(".device-row").forEach(row => {
+          row.onclick = () => openBoundDevice({
+            id: Number(row.getAttribute("data-id")),
+            ip: row.getAttribute("data-ip") || "",
+            mac: row.getAttribute("data-mac") || "",
+            name: row.getAttribute("data-name") || "Device",
+          });
+        });
+        wireDeviceDeleteButtons(box);
+      } catch (e) {
+        err.textContent = friendlyApiError(e, "Could not load devices.");
+      }
+    }
+
+    function openBoundDevice(dev) {
+      boundDevice = {
+        id: dev.id,
+        ip: dev.ip || "",
+        mac: dev.mac || "",
+        name: dev.name || "Device",
+      };
+      myDeviceIp = boundDevice.ip || null;
+      resetCalcLog("Waiting for this device’s SAW cycles…");
+      showViewBanner("", "");
+      lastGwError = "";
+      setBackNavLabel();
+      showView("view-user");
+      updateDeviceChip({
+        name: boundDevice.name,
+        ip: boundDevice.ip,
+        effective_label: "…",
+        active_name: "…",
+        online: dev.online,
+      }, { controlling: true });
+      stopPoll();
+      updateStatus();
+      pollTimer = setInterval(updateStatus, 3000);
+    }
+
+    document.getElementById("add-device-btn").onclick = async () => {
+      const err = document.getElementById("device-list-error");
+      const btn = document.getElementById("add-device-btn");
+      err.textContent = "";
+      const name = prompt("Name this device", "My PC");
+      if (name === null) return;
+      btn.disabled = true;
+      try {
+        const res = await api("/api/me/devices", {
+          method: "POST",
+          body: JSON.stringify({ name: name.trim() || "My device" }),
+        });
+        await refreshUserDevices();
+        if (res.device) {
+          if (res.client_ip || res.device.ip) {
+            err.textContent = "Bound " + (res.device.ip || res.client_ip) + " to this account.";
+          }
+          openBoundDevice(res.device);
+        }
+      } catch (e) {
+        const from = e.body && e.body.client_ip ? ` (this browser is ${e.body.client_ip})` : "";
+        err.textContent = friendlyApiError(e, "Could not add device.") + from;
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    document.getElementById("back-to-devices").onclick = () => {
+      stopPoll();
+      boundDevice = null;
+      myDeviceIp = null;
+      if (session && session.role === "admin") {
+        showView("view-admin");
+        refreshAdmin();
+        pollTimer = setInterval(refreshAdmin, 4000);
+        return;
+      }
+      showView("view-devices");
+      refreshUserDevices();
+      pollTimer = setInterval(refreshUserDevices, 4000);
+    };
+
+    document.getElementById("admin-open-dash").onclick = () => {
+      boundDevice = null;
+      myDeviceIp = null;
+      resetCalcLog("Waiting for host SAW cycles…");
+      showViewBanner("", "");
+      setBackNavLabel();
+      showView("view-user");
+      stopPoll();
+      updateStatus();
+      pollTimer = setInterval(updateStatus, 3000);
+    };
+
+    function enterRemoteAdmin(sess) {
+      session = Object.assign({}, sess || {}, { role: "admin", remote: true });
+      if (!hasAccountConsent(session)) {
+        requireConsentThen(() => enterRemoteAdmin(session));
+        return;
+      }
+      localStorage.setItem("autovpn_session", JSON.stringify(session));
+      localStorage.setItem("autovpn_onboarded", "1");
+      applyRemoteUi(true, session.banner || REMOTE_BANNER_TEXT);
+      applyMode();
+      updateNavUsers();
+      stopPoll();
+      boundDevice = null;
+      myDeviceIp = null;
+      if (isAdvanced()) {
+        showView("view-admin");
+        refreshAdmin();
+        pollTimer = setInterval(refreshAdmin, 4000);
+      } else {
+        showView("view-devices");
+        refreshUserDevices();
+        pollTimer = setInterval(refreshUserDevices, 4000);
+      }
+    }
+
+    function enterApp(sess) {
+      if (sess) session = sess;
+      if (!hasAccountConsent(session)) {
+        requireConsentThen(() => enterApp(session));
+        return;
+      }
+      stopPoll();
+      boundDevice = null;
+      updateNavUsers();
+      applyMode();
+      if (sess && (sess.remote || sess.skip_login)) {
+        enterRemoteAdmin(sess);
+        return;
+      }
+      applyRemoteUi(false);
+      setGatewayUi(true);
+      ensureConnectedOnOpen().finally(() => {
+        if (sess.role === "admin" && isAdvanced()) {
+          showView("view-admin");
+          refreshAdmin();
+          pollTimer = setInterval(refreshAdmin, 4000);
+        } else {
+          showView("view-devices");
+          refreshUserDevices();
+          pollTimer = setInterval(refreshUserDevices, 4000);
+        }
+      });
+    }
+
+    async function ensureConnectedOnOpen() {
+      setGatewayUi(true);
+      if (isRemoteSession()) return;
+      try {
+        const status = await api("/api/status");
+        if (status && status.gateway_enabled === true) return;
+      } catch (e) {}
+      try {
+        await changeGateway(true);
+      } catch (e) {}
+    }
+
+    function stopPoll() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    async function logout() {
+      closeModal("consent-modal");
+      afterConsent = null;
+      if (isRemoteSession()) {
+        enterRemoteAdmin(session || { role: "admin", remote: true });
+        return;
+      }
+      stopPoll();
+      try { await api("/api/logout", { method: "POST", body: "{}" }); } catch (_) {}
+      session = null;
+      boundDevice = null;
+      myDeviceIp = null;
+      localStorage.removeItem("autovpn_session");
+      applyRemoteUi(false);
+      showView("view-login");
+    }
+    document.getElementById("logout-user").onclick = logout;
+    document.getElementById("logout-admin").onclick = logout;
+    document.getElementById("logout-devices").onclick = logout;
+
+    document.getElementById("profile-selector").onchange = async (e) => {
+      const profile = e.target.value;
+      document.getElementById("custom-panel").style.display = profile === "custom" ? "block" : "none";
+      if (profile === "custom") {
+        setProfileMeta(FRIENDLY_PROFILE.custom, "custom");
+        updateBudgetUI();
+        // Must persist - otherwise the 3s status poll snaps the selector back to Auto
+        try {
+          const res = await api("/api/set-profile", {
+            method: "POST",
+            body: JSON.stringify({ profile: "custom", device_ip: targetDeviceIp() }),
+          });
+          if (res.device_ip && !boundDevice) myDeviceIp = res.device_ip;
+          if (res.device) updateDeviceChip({ ...res.device, name: (boundDevice && boundDevice.name) || res.device.name }, { controlling: !!boundDevice });
+        } catch (_) { /* keep panel open; apply still works when gateway is up */ }
+        return;
+      }
+      setLoading(true, profile === "auto" ? "Starting Auto mode…" : "Switching mode…");
+      try {
+        const res = await api("/api/set-profile", {
+          method: "POST",
+          body: JSON.stringify({ profile, device_ip: targetDeviceIp() }),
+        });
+        if (res.device_ip && !boundDevice) myDeviceIp = res.device_ip;
+        if (res.device) updateDeviceChip({ ...res.device, name: (boundDevice && boundDevice.name) || res.device.name }, { controlling: !!boundDevice });
+        setProfileMeta(res.profile_info || FRIENDLY_PROFILE[profile], profile, res.auto);
+        if (res.auto && res.auto.detected) lastAutoDetected = res.auto.detected;
+        if (res.metrics) renderMetrics(res.metrics, {
+          switched: !!res.switched,
+          profile: res.effective_profile || profile,
+          evidence: (res.auto && res.auto.evidence) || "",
+          device: res.device_ip || targetDeviceIp() || "",
+          qos_mode: res.qos_mode,
+          qos_label: res.qos_label,
+          controlling: !!boundDevice,
+        });
+        else await updateStatus();
+      } catch (e) {
+        document.getElementById("hero-vpn").textContent = "Unavailable";
+        document.getElementById("hero-quality").innerHTML =
+          `<span class="badge badge-poor">Could not switch</span>`;
+        showViewBanner(friendlyApiError(e, "Could not switch mode."), "bad");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    document.getElementById("apply-weights").onclick = async () => {
+      const raw = readWeights();
+      const total = raw.reduce((a, b) => a + b, 0);
+      if (!total) return alert("Give at least one priority a few points.");
+      if (total > BUDGET_TOTAL) return alert("You're over the 100-point budget. Lower some sliders first.");
+      const weights = raw.map(v => v / BUDGET_TOTAL);
+      setLoading(true, "Applying priorities…");
+      try {
+        const res = await api("/api/set-weights", {
+          method: "POST",
+          body: JSON.stringify({ weights, device_ip: targetDeviceIp() }),
+        });
+        const sel = document.getElementById("profile-selector");
+        if (sel) sel.value = "custom";
+        document.getElementById("custom-panel").style.display = "block";
+        setProfileMeta(FRIENDLY_PROFILE.custom, "custom");
+        if (res.device) updateDeviceChip({ ...res.device, name: (boundDevice && boundDevice.name) || res.device.name }, { controlling: !!boundDevice });
+        if (res.metrics) renderMetrics(res.metrics, {
+          switched: !!res.switched,
+          profile: "custom",
+          device: res.device_ip || targetDeviceIp() || "",
+          qos_mode: res.qos_mode,
+          qos_label: res.qos_label,
+          controlling: !!boundDevice,
+        });
+      } catch (e) {
+        alert(friendlyApiError(e, "Priorities not applied."));
+      } finally { setLoading(false); }
+    };
+
+    async function changeGateway(enabled, opts) {
+      if (syncingGatewayToggle) return;
+      if (isRemoteSession()) {
+        setSimpleGwError("Gateway is lab Wi‑Fi only.");
+        return;
+      }
+      const quiet = !isAdvanced();
+      setGatewayUi(!!enabled);
+      if (!quiet) setLoading(true, enabled ? "Connecting to the gateway…" : "Disconnecting from the gateway…");
+      try {
+        const res = await api("/api/gateway", {
+          method: "POST",
+          body: JSON.stringify({ enabled }),
+        });
+        lastGwError = "";
+        setSimpleGwError("");
+        setGatewayUi(!!res.gateway_enabled);
+        showViewBanner("", "");
+        if (opts && opts.admin) refreshAdmin();
+        else if (res.metrics) renderMetrics(res.metrics, { switched: !!res.switched, qos_mode: res.qos_mode, qos_label: res.qos_label });
+        else updateStatus();
+      } catch (e) {
+        const stillOff = e.status === 409 || (e.body && e.body.gateway_enabled === false);
+        setGatewayUi(stillOff ? false : !enabled);
+        lastGwError = friendlyApiError(e, "Could not change gateway.");
+        setSimpleGwError(lastGwError);
+        if (!quiet) {
+          showViewBanner(lastGwError, "bad");
+          alert(lastGwError);
+        }
+      } finally {
+        if (!quiet) setLoading(false);
+      }
+    }
+
+    document.getElementById("gateway-toggle").onchange = (e) => {
+      changeGateway(!!e.target.checked, {});
+    };
+    document.getElementById("gateway-toggle-admin").onchange = (e) => {
+      changeGateway(!!e.target.checked, { admin: true });
+    };
+    document.getElementById("gateway-toggle-simple").onchange = (e) => {
+      changeGateway(!!e.target.checked, {});
+    };
+    document.getElementById("gateway-toggle-simple-user").onchange = (e) => {
+      changeGateway(!!e.target.checked, {});
+    };
+
+    async function updateStatus() {
+      try {
+        const data = await api(statusUrl());
+        const isDeviceView = !!(boundDevice || data.view === "device");
+        // Never paint host rankings while controlling a device.
+        const list = isDeviceView
+          ? ((data.device && data.device.metrics) || data.metrics || [])
+          : (Array.isArray(data) ? data : (data.metrics || []));
+        if (typeof data.gateway_enabled === "boolean") setGatewayUi(data.gateway_enabled);
+        if (data.remote && typeof data.remote.off_lan === "boolean") {
+          setRemoteHint(data.remote.off_lan);
+        }
+
+        const live = (isDeviceView && data.device) ? data.device : (data.device || null);
+        if (boundDevice) {
+          if (data.device_ip) boundDevice.ip = data.device_ip;
+          myDeviceIp = boundDevice.ip || myDeviceIp;
+          updateDeviceChip({
+            name: boundDevice.name || (live && live.name),
+            ip: boundDevice.ip || (live && live.ip),
+            online: live ? live.online : false,
+            effective_label: (live && (live.effective_label || live.profile)) || "-",
+            profile: live && live.profile,
+            active_name: (live && live.active_name) || data.active_path,
+            egress: live && live.egress,
+            egress_dev: live && live.egress_dev,
+            egress_via: live && live.egress_via,
+          }, { controlling: true });
+        } else if (live) {
+          myDeviceIp = live.ip;
+          updateDeviceChip(live, { controlling: data.view === "device" });
+        } else {
+          updateDeviceChip(null);
+        }
+
+        const offline = !!(isDeviceView && live && live.online === false);
+        const vpnName = (live && live.active_name) || data.active_path
+          || ((list.find(r => r.is_active) || list[0] || {}).name) || "";
+        setSimpleCopy(
+          simpleSentence(data.profile || (live && live.profile), vpnName, data.auto || (live && live.auto)),
+          simpleStatusText({ gatewayOff: !gatewayEnabled, offline })
+        );
+        if (lastGwError) {
+          if (isAdvanced()) showViewBanner(lastGwError, "bad");
+          else {
+            showViewBanner("", "");
+            setSimpleGwError(lastGwError);
+          }
+        } else if (offline) {
+          if (isAdvanced()) {
+            showViewBanner(
+              `${boundDevice && boundDevice.name ? boundDevice.name : "This device"} is offline. `
+              + "Scores below are for its saved profile (live tunnel QoS or characteristic fallback) - not the host or the browser you are using.",
+              "warn"
+            );
+          } else {
+            showViewBanner("", "");
+          }
+        } else if (isDeviceView && !list.length) {
+          if (isAdvanced()) {
+            showViewBanner(
+              "Waiting for this device’s first SAW cycle. Host numbers are not shown here.",
+              "info"
+            );
+          } else {
+            showViewBanner("", "");
+          }
+        } else {
+          showViewBanner("", "");
+        }
+
+        const profile = (data && data.profile) || "balanced";
+        setProfileMeta(
+          (data && data.profile_info) || FRIENDLY_PROFILE[profile],
+          profile,
+          data && data.auto
+        );
+        const sel = document.getElementById("profile-selector");
+        const loading = document.getElementById("loading-overlay").classList.contains("show");
+        if (sel && sel.value !== profile && !loading) sel.value = profile;
+        document.getElementById("custom-panel").style.display =
+          profile === "custom" ? "block" : "none";
+
+        let autoSwitched = false;
+        if (profile === "auto" && data.auto && data.auto.detected) {
+          if (lastAutoDetected && lastAutoDetected !== data.auto.detected) {
+            autoSwitched = true;
+            setLoading(true, `Auto → ${data.auto.label || data.auto.detected}…`);
+            setTimeout(() => setLoading(false), 700);
+          }
+          lastAutoDetected = data.auto.detected;
+        }
+
+        const who = isDeviceView
+          ? ((live && live.ip) || (boundDevice && boundDevice.ip) || data.device_ip || "")
+          : "";
+        const switchReason = (isDeviceView && live && live.switch_reason)
+          || data.switch_reason
+          || "";
+        renderMetrics(list, {
+          switched: autoSwitched,
+          profile: (data.auto && data.auto.active)
+            ? `auto→${data.auto.detected || data.effective_profile || profile}`
+            : (data.effective_profile || profile),
+          evidence: (data.auto && data.auto.evidence) || (live && live.evidence) || "",
+          device: who,
+          qos_mode: data.qos_mode,
+          qos_label: data.qos_label,
+          switch_reason: switchReason,
+          controlling: isDeviceView,
+          offline,
+          egress: live && live.egress,
+          egress_dev: live && live.egress_dev,
+          empty: isDeviceView
+            ? "No scores for this device yet. This is not the host ranking."
+            : "Waiting for the host SAW cycle…",
+          saw: data.saw || {},
+          active_name: (live && live.active_name) || data.active_path || vpnName || "",
+        });
+        const liveLines = Array.isArray(data.events) ? data.events.slice() : [];
+        if (switchReason && !liveLines.some((ln) => String(ln).includes(switchReason))) {
+          liveLines.unshift(switchReason);
+        }
+        renderLiveLog(liveLines);
+        applySimulatedState(data);
+      } catch (e) {
+        const msg = friendlyApiError(e, "Cannot reach the gateway.");
+        document.getElementById("hero-vpn").textContent = "Offline";
+        document.getElementById("hero-quality").innerHTML =
+          `<span class="badge badge-poor">Cannot reach API</span>`;
+        setSimpleCopy("Can't reach the gateway", "Offline");
+        if (isAdvanced()) showViewBanner(msg, "bad");
+        else {
+          showViewBanner("", "");
+          setSimpleGwError(msg);
+        }
+      }
+    }
+
+    async function renderAdminAccounts(query = "") {
+      const box = document.getElementById("admin-account-list");
+      if (!box) return;
+      try {
+        const q = encodeURIComponent(query || "");
+        const data = await api(`/api/admin/accounts?q=${q}`);
+        const list = data.accounts || [];
+        if (!list.length) {
+          box.innerHTML = "<div style='color:#888;font-size:13px'>No accounts match.</div>";
+          return;
+        }
+        const adminCount = list.filter((a) => a.role === "admin").length;
+        const meId = session && session.user_id;
+        box.innerHTML = list.map(a => {
+          const lastAdmin = a.role === "admin" && adminCount <= 1;
+          const self = meId != null && Number(a.id) === Number(meId);
+          const delLabel = lastAdmin ? "Last admin" : (self ? "You" : "Delete");
+          const delDisabled = lastAdmin ? "disabled" : "";
+          return `
+          <div class="device-row" data-id="${a.id}">
+            <div>
+              <div class="name">${escapeLog(a.username)} ${a.role === "admin" ? "· admin" : ""}</div>
+              <div class="meta">${a.device_count} device${a.device_count === 1 ? "" : "s"}</div>
+            </div>
+            <div class="acct-row-actions">
+              <button type="button" class="btn btn-danger btn-sm admin-del-user" data-id="${a.id}" data-name="${escapeAttr(a.username)}" ${delDisabled}>${delLabel}</button>
+              <div style="color:var(--accent);font-weight:600">Open →</div>
+            </div>
+          </div>`;
+        }).join("");
+        box.querySelectorAll(".device-row").forEach(row => {
+          row.onclick = () => openAdminAccount(Number(row.getAttribute("data-id")));
+        });
+        box.querySelectorAll(".admin-del-user").forEach((btn) => {
+          btn.onclick = (ev) => {
+            ev.stopPropagation();
+            if (btn.disabled) return;
+            const id = Number(btn.getAttribute("data-id"));
+            const name = btn.getAttribute("data-name") || "this account";
+            const self = meId != null && id === Number(meId);
+            if (self) {
+              confirmDeleteOwnAccount();
+              return;
+            }
+            confirmDeleteOtherUser(id, name);
+          };
+        });
+      } catch (e) {
+        box.innerHTML = `<div style="color:#f66;font-size:13px">${e.message}</div>`;
+      }
+    }
+
+    function setAccountsCrumb(name) {
+      const root = document.getElementById("admin-acct-crumb-root");
+      const sep = document.getElementById("admin-acct-crumb-sep");
+      const nm = document.getElementById("admin-acct-crumb-name");
+      const listWrap = document.getElementById("admin-accounts-list-wrap");
+      const panel = document.getElementById("admin-account-devices");
+      const drilled = !!name;
+      if (root) {
+        if (drilled) root.removeAttribute("aria-current");
+        else root.setAttribute("aria-current", "page");
+      }
+      if (sep) sep.hidden = !drilled;
+      if (nm) {
+        nm.hidden = !drilled;
+        nm.textContent = name || "";
+      }
+      if (listWrap) listWrap.hidden = drilled;
+      if (panel) panel.hidden = !drilled;
+    }
+
+    function closeAdminAccount() {
+      selectedAccountId = null;
+      setAccountsCrumb("");
+    }
+
+    async function openAdminAccount(accountId) {
+      selectedAccountId = accountId;
+      try {
+        const data = await api(`/api/admin/accounts/${accountId}/devices`);
+        const uname = (data.account && data.account.username) || "Account";
+        setAccountsCrumb(uname);
+        const box = document.getElementById("admin-acct-device-list");
+        const list = data.devices || [];
+        if (!list.length) {
+          box.innerHTML = "<div style='color:#888;font-size:13px'>This account has no bound devices yet.</div>";
+          return;
+        }
+        box.innerHTML = list.map(d => {
+          const st = deviceStatusEmojis(d);
+          return `
+          <div class="device-row ${d.online ? "" : "offline"}" data-id="${d.id || ""}" data-ip="${d.ip || ""}">
+            <div>
+              <div class="name">${st.online} ${d.name || "Device"}</div>
+              <div class="meta">${d.ip || "-"} ${d.mac ? "· " + d.mac : ""} · ${st.label}${st.evidence ? " · " + st.evidence : ""}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:20px;letter-spacing:2px">${st.profile} ${st.vpn}</div>
+              <div class="meta">${d.active_name || "-"}</div>
+              <div style="margin-top:8px">${deviceDeleteBtn(d)}</div>
+            </div>
+          </div>`;
+        }).join("");
+        box.querySelectorAll(".device-row").forEach(row => {
+          const ip = row.getAttribute("data-ip");
+          if (ip) row.onclick = () => openAdminDevice(ip);
+        });
+        wireDeviceDeleteButtons(box, { adminAccountId: accountId });
+      } catch (e) {
+        closeAdminAccount();
+        alert("Could not load account devices: " + e.message);
+      }
+    }
+
+    document.getElementById("admin-acct-crumb-root").onclick = () => {
+      closeAdminAccount();
+    };
+
+    let accountSearchTimer = null;
+    document.getElementById("admin-account-search").addEventListener("input", (e) => {
+      clearTimeout(accountSearchTimer);
+      accountSearchTimer = setTimeout(() => renderAdminAccounts(e.target.value), 200);
+    });
+
+    async function refreshAdmin() {
+      try {
+        const [status, health, logs] = await Promise.all([
+          api("/api/status"),
+          api("/api/admin/health"),
+          api("/api/admin/logs")
+        ]);
+        const list = Array.isArray(status) ? status : (status.metrics || []);
+        setTagline(list.length || 5);
+
+        const force = document.getElementById("force-regime");
+        const prev = force.value;
+        force.innerHTML = list.map(r =>
+          `<option value="${r.id || r.name}">${r.name}</option>`).join("");
+        if (prev) force.value = prev;
+
+        document.getElementById("admin-table").innerHTML = list.map(r =>
+          `<tr>
+            <td>${r.name}</td>
+            <td>${r.iface || "-"}</td>
+            <td>${(r.score || 0).toFixed(3)}</td>
+            <td>${r.source || (r.live ? "live" : "baseline")}</td>
+            <td>${r.latency} ms</td>
+            <td class="${r.is_active ? "ok" : ""}">${r.is_active ? "YES" : ""}</td>
+          </tr>`).join("");
+
+        const lab = health.lab || {};
+        const flag = (yes, label, detail) =>
+          `<div class="regime-row"><span>${label}</span><span class="${yes ? "ok" : "bad"}">${yes ? "UP" : "DOWN"}${detail ? " · " + detail : ""}</span></div>`;
+        const ifaces = lab.ifaces || {};
+        const ifaceRow = (key) => {
+          const i = ifaces[key] || {};
+          return flag(!!i.up, key, i.ipv4 || (i.present ? (i.state || "") : "missing"));
+        };
+        const wgSimOk = health.wireguard_healthy !== false;
+        document.getElementById("admin-lab").innerHTML = [
+          flag(!!lab.forwarding_ready, "Forwarding ready", lab.dhcp_gateway ? ("DHCP " + lab.dhcp_gateway) : ""),
+          flag(!!lab.mikrotik_reachable, "MikroTik", lab.mikrotik_host || "192.168.50.1"),
+          flag(!!lab.forwarding, "ip_forward"),
+          flag(wgSimOk, "WireGuard (SAW)", wgSimOk ? "healthy" : "simulated down"),
+          ifaceRow("enp0s8"),
+          ifaceRow("enp0s9"),
+          ifaceRow("wg0"),
+          ifaceRow("sstp0"),
+          ifaceRow("tun1"),
+          ifaceRow("nebula1"),
+          (lab.notes || []).map(n => `<div style="font-size:12px;color:#999;margin-top:4px">${n}</div>`).join(""),
+        ].join("");
+        setWgFailLabel(wgSimOk);
+        const adminProf = document.getElementById("admin-profile");
+        if (adminProf && status.profile && adminProf !== document.activeElement) {
+          adminProf.value = status.profile;
+        }
+
+        document.getElementById("admin-containers").innerHTML =
+          (health.containers || []).map(c => {
+            const mixed = !!c.iface_up !== !!c.running;
+            const cls = (c.iface_up && c.running) ? "ok" : (mixed ? "warn" : "bad");
+            const kind = c.dummy ? "dummy" : (c.vpn_carries_internet ? "WAN" : "no-WAN");
+            const wan = c.vpn_carries_internet ? " · 8.8.8.8 OK" : " · 8.8.8.8 FAIL";
+            return `<div class="regime-row">
+              <span>${c.name}${kind ? ` <span style="color:#888;font-size:12px">${kind}</span>` : ""}</span>
+              <span class="${cls}">iface ${c.iface_up ? "UP" : "DOWN"} · proc ${c.running ? "UP" : "DOWN"}${c.iface_up ? wan : ""}</span>
+            </div>`;
+          }).join("") || "<div>No path data</div>";
+
+        document.getElementById("admin-log").textContent =
+          (logs.lines || []).join("\n") || "No handovers yet.";
+        const deviceList = (health.devices && health.devices.length)
+          ? health.devices
+          : ((status.devices) || []);
+        renderAdminDevices(deviceList);
+        await renderAdminAccounts(document.getElementById("admin-account-search")?.value || "");
+        await renderAdminBugs();
+        if (selectedAccountId) openAdminAccount(selectedAccountId);
+        if (selectedAdminDevice) openAdminDevice(selectedAdminDevice);
+        if (typeof status.gateway_enabled === "boolean") setGatewayUi(status.gateway_enabled);
+        else if (typeof health.gateway_enabled === "boolean") setGatewayUi(health.gateway_enabled);
+        if (status.remote && typeof status.remote.off_lan === "boolean") {
+          setRemoteHint(status.remote.off_lan);
+        }
+        applySimulatedState({
+          simulated_down: health.simulated_down || status.simulated_down,
+          fail_paths: health.fail_paths || status.fail_paths,
+          wireguard_healthy: health.wireguard_healthy,
+        });
+      } catch (e) {
+        document.getElementById("admin-log").textContent = "Admin API offline: " + e.message;
+      }
+    }
+
+    document.getElementById("refresh-admin").onclick = refreshAdmin;
+    document.addEventListener("click", (ev) => {
+      const restoreAllBtn = ev.target.closest("[data-restore-all]");
+      if (restoreAllBtn) {
+        ev.preventDefault();
+        restoreAllPaths();
+        return;
+      }
+      const isolateBtn = ev.target.closest("[data-isolate-id]");
+      if (isolateBtn) {
+        ev.preventDefault();
+        isolatePath(isolateBtn.getAttribute("data-isolate-id"));
+        return;
+      }
+      const btn = ev.target.closest("[data-fail-id]");
+      if (btn) {
+        ev.preventDefault();
+        togglePathFailure(btn.getAttribute("data-fail-id"));
+      }
+    });
+    renderFailGrids();
+    document.getElementById("admin-fail").onclick = async () => {
+      try {
+        const body = {};
+        const dip = targetDeviceIp();
+        if (dip) body.device_ip = dip;
+        const res = await api("/api/toggle-failure", { method: "POST", body: JSON.stringify(body) });
+        applySimulatedState(res);
+        refreshAdmin();
+      } catch (e) {
+        alert(friendlyApiError(e, "Could not toggle WireGuard failure."));
+      }
+    };
+    document.getElementById("admin-profile-btn").onclick = async () => {
+      const profile = document.getElementById("admin-profile").value;
+      try {
+        await api("/api/set-profile", {
+          method: "POST",
+          body: JSON.stringify({ profile }),
+        });
+        refreshAdmin();
+      } catch (e) {
+        alert(friendlyApiError(e, "Could not apply host profile."));
+      }
+    };
+    document.getElementById("force-btn").onclick = async () => {
+      const regime = document.getElementById("force-regime").value;
+      try {
+        await api("/api/admin/force", { method: "POST", body: JSON.stringify({ regime }) });
+        refreshAdmin();
+      } catch (e) { alert(friendlyApiError(e, "Force handover failed")); }
+    };
+
+    const ADMIN_TAB_KEY = "autovpnAdminTab";
+
+    function setAdminTab(name) {
+      const tab = name || "accounts";
+      document.querySelectorAll(".admin-tab").forEach((btn) => {
+        const on = btn.getAttribute("data-tab") === tab;
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      document.querySelectorAll(".admin-pane").forEach((pane) => {
+        pane.classList.toggle("active", pane.getAttribute("data-pane") === tab);
+      });
+      localStorage.setItem(ADMIN_TAB_KEY, tab);
+      if (tab === "reports") renderAdminBugs();
+    }
+
+    document.querySelectorAll(".admin-tab").forEach((btn) => {
+      btn.addEventListener("click", () => setAdminTab(btn.getAttribute("data-tab")));
+    });
+    setAdminTab(localStorage.getItem(ADMIN_TAB_KEY) || "accounts");
+
+    function fmtWhen(ts) {
+      const n = Number(ts);
+      if (!n) return "";
+      try { return new Date(n * 1000).toLocaleString(); } catch (_) { return ""; }
+    }
+
+    async function renderAdminBugs() {
+      const box = document.getElementById("admin-bug-list");
+      const badge = document.getElementById("reports-badge");
+      if (!box) return;
+      if (box.contains(document.activeElement)) return;
+      try {
+        const data = await api("/api/admin/bugs");
+        const list = data.bugs || [];
+        const nNew = Number(data.new_count || 0);
+        if (badge) {
+          badge.hidden = nNew <= 0;
+          badge.textContent = String(nNew);
+        }
+        if (!list.length) {
+          box.innerHTML = "<div class='empty-state'>No bug reports yet.</div>";
+          return;
+        }
+        box.innerHTML = list.map((b) => `
+          <div class="bug-item" data-id="${b.id}">
+            <div class="bug-head">
+              <div>
+                <div class="name">${escapeLog(b.title)}</div>
+                <div class="meta">${escapeLog(b.user)} · ${fmtWhen(b.created)}</div>
+              </div>
+              <select class="bug-status" data-id="${b.id}" style="width:auto;min-width:110px">
+                <option value="new"${b.status === "new" ? " selected" : ""}>new</option>
+                <option value="seen"${b.status === "seen" ? " selected" : ""}>seen</option>
+                <option value="done"${b.status === "done" ? " selected" : ""}>done</option>
+              </select>
+            </div>
+            <p style="margin:10px 0;font-size:13px;color:#ccc;white-space:pre-wrap">${escapeLog(b.body)}</p>
+            <label>Admin note</label>
+            <input class="bug-note" data-id="${b.id}" type="text" maxlength="2000" value="${escapeAttr(b.note || "")}" placeholder="Optional note…" />
+            <div class="btn-row" style="margin-top:8px">
+              <button type="button" class="btn btn-blue btn-sm bug-save" data-id="${b.id}" style="flex:0 0 auto">Save</button>
+            </div>
+          </div>`).join("");
+        box.querySelectorAll(".bug-save").forEach((btn) => {
+          btn.onclick = () => saveBug(Number(btn.getAttribute("data-id")));
+        });
+      } catch (e) {
+        box.innerHTML = `<div style="color:#f66;font-size:13px">${escapeLog(e.message)}</div>`;
+      }
+    }
+
+    async function saveBug(id) {
+      const box = document.getElementById("admin-bug-list");
+      if (!box) return;
+      const item = box.querySelector(`.bug-item[data-id="${id}"]`);
+      if (!item) return;
+      const status = (item.querySelector(".bug-status") || {}).value;
+      const note = (item.querySelector(".bug-note") || {}).value || "";
+      try {
+        await api(`/api/admin/bugs/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status, note }),
+        });
+        await renderAdminBugs();
+      } catch (e) {
+        alert(friendlyApiError(e, "Could not update report."));
+      }
+    }
+
+    function openModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add("show");
+    }
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove("show");
+    }
+
+    document.getElementById("consent-check").addEventListener("change", syncConsentEnter);
+    document.getElementById("consent-enter").onclick = async () => {
+      const box = document.getElementById("consent-check");
+      const err = document.getElementById("consent-error");
+      const btn = document.getElementById("consent-enter");
+      err.textContent = "";
+      if (!box.checked) {
+        err.textContent = "Tick the box to continue.";
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const res = await api("/api/consent", {
+          method: "POST",
+          body: JSON.stringify({ consent: true }),
+        });
+        if (session) {
+          session.data_consent = !!(res && res.data_consent !== false);
+          localStorage.setItem("autovpn_session", JSON.stringify(session));
+        }
+        const next = afterConsent;
+        afterConsent = null;
+        closeModal("consent-modal");
+        if (typeof next === "function") next();
+      } catch (e) {
+        err.textContent = friendlyApiError(e, "Could not save consent.");
+        syncConsentEnter();
+      } finally {
+        btn.disabled = false;
+        syncConsentEnter();
+      }
+    };
+    document.getElementById("consent-logout").onclick = () => logout();
+
+    let confirmResolver = null;
+
+    function askConfirm(title, body, okLabel) {
+      document.getElementById("confirm-title").textContent = title;
+      document.getElementById("confirm-body").textContent = body;
+      document.getElementById("confirm-error").textContent = "";
+      document.getElementById("confirm-ok").textContent = okLabel || "Delete";
+      openModal("confirm-modal");
+      return new Promise((resolve) => { confirmResolver = resolve; });
+    }
+
+    document.getElementById("confirm-cancel").onclick = () => {
+      closeModal("confirm-modal");
+      if (confirmResolver) confirmResolver(false);
+      confirmResolver = null;
+    };
+    document.getElementById("confirm-ok").onclick = () => {
+      closeModal("confirm-modal");
+      if (confirmResolver) confirmResolver(true);
+      confirmResolver = null;
+    };
+
+    async function confirmDeleteOwnAccount() {
+      closeAcctMenus();
+      if (isRemoteSession()) {
+        alert("Remote hallway cannot delete the lab admin.");
+        return;
+      }
+      const ok = await askConfirm(
+        "Delete your account?",
+        "This removes your login, devices, and this session. It cannot be undone.",
+        "Delete account"
+      );
+      if (!ok) return;
+      try {
+        await api("/api/account", { method: "DELETE" });
+        await logout();
+      } catch (e) {
+        alert(friendlyApiError(e, "Could not delete account."));
+      }
+    }
+
+    async function confirmDeleteOtherUser(id, name) {
+      const ok = await askConfirm(
+        "Delete this account?",
+        `Remove ${name} and their bound devices?`,
+        "Delete"
+      );
+      if (!ok) return;
+      try {
+        await api(`/api/admin/users/${id}`, { method: "DELETE" });
+        closeAdminAccount();
+        await renderAdminAccounts(document.getElementById("admin-account-search")?.value || "");
+      } catch (e) {
+        alert(friendlyApiError(e, "Could not delete account."));
+      }
+    }
+
+    document.querySelectorAll(".acct-toggle").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const wrap = btn.closest(".acct-wrap");
+        const drop = wrap && wrap.querySelector(".acct-drop");
+        if (!drop) return;
+        const willOpen = drop.hidden;
+        closeAcctMenus();
+        drop.hidden = !willOpen;
+        btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+      });
+    });
+    document.querySelectorAll(".delete-account-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        confirmDeleteOwnAccount();
+      });
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".acct-wrap")) closeAcctMenus();
+    });
+
+    document.getElementById("bug-fab").onclick = () => {
+      document.getElementById("bug-error").textContent = "";
+      document.getElementById("bug-title").value = "";
+      document.getElementById("bug-body").value = "";
+      openModal("bug-modal");
+      document.getElementById("bug-title").focus();
+    };
+    document.getElementById("bug-cancel").onclick = () => closeModal("bug-modal");
+    document.getElementById("bug-submit").onclick = async () => {
+      const err = document.getElementById("bug-error");
+      const btn = document.getElementById("bug-submit");
+      const title = document.getElementById("bug-title").value.trim();
+      const body = document.getElementById("bug-body").value.trim();
+      err.textContent = "";
+      if (!title) { err.textContent = "Add a short title."; return; }
+      if (!body) { err.textContent = "Add a short description."; return; }
+      btn.disabled = true;
+      try {
+        await api("/api/bugs", {
+          method: "POST",
+          body: JSON.stringify({ title, body }),
+        });
+        closeModal("bug-modal");
+      } catch (e) {
+        err.textContent = friendlyApiError(e, "Could not send the report.");
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    document.querySelectorAll("[data-mode-toggle]").forEach((btn) => {
+      btn.addEventListener("click", () => setAdvanced(!isAdvanced()));
+    });
+    applyMode();
+    setRemoteHint(null);
+
+    (async () => {
+      try {
+        const probe = await api("/api/session");
+        if (probe && probe.skip_login) {
+          enterRemoteAdmin({
+            token: probe.token || "",
+            role: "admin",
+            username: probe.username || "admin",
+            user_id: probe.user_id,
+            remote: true,
+            skip_login: true,
+            banner: probe.banner || REMOTE_BANNER_TEXT,
+          });
+          return;
+        }
+        applyRemoteUi(false);
+        const saved = JSON.parse(localStorage.getItem("autovpn_session") || "null");
+        if (saved && saved.role && saved.token) {
+          session = saved;
+          try {
+            const me = await api("/api/me");
+            session.role = me.role || session.role;
+            session.username = me.username || session.username;
+            if (me.user_id) session.user_id = me.user_id;
+            session.remote = !!me.remote;
+            session.data_consent = !!me.data_consent;
+            localStorage.setItem("autovpn_session", JSON.stringify(session));
+            if (session.remote) {
+              enterRemoteAdmin(session);
+              return;
+            }
+          } catch (_) {
+            return;
+          }
+          if (!localStorage.getItem("autovpn_onboarded")) {
+            renderOnboard(); showView("view-onboard");
+          } else enterApp(session);
+        } else if (saved) {
+          localStorage.removeItem("autovpn_session");
+        }
+      } catch (_) {
+        if (offLanFromLocation()) applyRemoteUi(true);
+      }
+    })();
+
+    document.getElementById("username").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("password").focus();
+    });
+    document.getElementById("password").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("login-btn").click();
+    });
+    document.getElementById("signup-username").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("signup-password").focus();
+    });
+    document.getElementById("signup-password").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("signup-password2").focus();
+    });
+    document.getElementById("signup-password2").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("signup-btn").click();
+    });
+    setDetailsToggleLabel();
+    setLiveLogToggleLabel();
+  </script>
+</body>
+</html>
